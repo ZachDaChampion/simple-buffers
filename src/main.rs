@@ -109,7 +109,6 @@ fn print_ast() -> Result<(), Box<dyn Error>> {
                         }
                         indent += 1;
                     }
-                    _ => {}
                 }
             }
             Visitor::Cleanup(node) => match node {

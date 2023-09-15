@@ -71,27 +71,6 @@ impl<'a> AstBuilder<'a> {
         })
     }
 
-    /// Creates an AstBuilder with the provided token iterator.
-    ///
-    /// # Arguments
-    ///
-    /// * `source` - The source string to parse.
-    /// * `file` - The name of the file being parsed.
-    /// * `tokens` - The tokenizer to use.
-    ///
-    /// # Returns
-    ///
-    /// An AstBuilder with the provided tokenizer.
-    pub fn with_tokens(source: &'a str, file: &'a str, mut tokens: Box<TokenIterator<'a>>) -> Self {
-        let current_token = tokens.next().transpose().unwrap();
-        Self {
-            source,
-            file,
-            tokens,
-            current_token,
-        }
-    }
-
     /// Parses the source string into a syntax tree.
     pub fn parse(&mut self) -> AstBuildResult {
         self.parse_file()

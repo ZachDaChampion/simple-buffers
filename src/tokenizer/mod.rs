@@ -98,24 +98,6 @@ impl<'a> Tokenizer<'a> {
         Ok(tokenizer)
     }
 
-    /// Returns whether or not the tokenizer has reached the end of the source string.
-    ///
-    /// # Returns
-    ///
-    /// * `true` if the tokenizer has reached the end of the source string, `false` otherwise.
-    pub fn is_eof(&self) -> bool {
-        self.next_token.is_none()
-    }
-
-    /// Peeks at the next token in the source string.
-    ///
-    /// # Returns
-    ///
-    /// * `Some(token)` if there is a next token, `None` otherwise.
-    pub fn peek(&self) -> Option<&Token> {
-        self.next_token.as_ref()
-    }
-
     /// Returns the next token in the source string and advances the tokenizer.
     ///
     /// # Returns
