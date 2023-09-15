@@ -3,9 +3,9 @@ use std::fmt;
 
 use crate::tokenizer::Token;
 
-/// An error that is returned by the parser.
+/// An error that is returned by the AST builder.
 #[derive(Debug)]
-pub enum ParserError {
+pub enum AstBuilderError {
     /// An unexpected token was encountered.
     UnexpectedToken {
         /// The file where the unexpected token was encountered.
@@ -31,9 +31,9 @@ pub enum ParserError {
     },
 }
 
-impl std::error::Error for ParserError {}
+impl std::error::Error for AstBuilderError {}
 
-impl fmt::Display for ParserError {
+impl fmt::Display for AstBuilderError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::UnexpectedToken {

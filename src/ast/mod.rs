@@ -1,6 +1,5 @@
-//! A parser can parse a string into a syntax tree.
-//! This parser implements recursive descent parsing.
-//! See: <http://craftinginterpreters.com/parsing-expressions.html>
+//! An AST builder can parse a string into a syntax tree. This parser implements recursive descent
+//! parsing. See: <http://craftinginterpreters.com/parsing-expressions.html>
 //!
 //! # Grammar
 //! - file       ->  (sequence | enum)* EOF
@@ -16,7 +15,7 @@ use std::error::Error;
 
 use crate::tokenizer::{Token, TokenIterator, TokenType, Tokenizer};
 
-use self::error::ParserError;
+use self::error::AstBuilderError;
 
 mod error;
 
@@ -31,8 +30,8 @@ pub enum SyntaxTree {
     Oneof(Vec<SyntaxTree>),
 }
 
-/// A parser that lazily parses a string into a syntax tree.
-pub struct Parser<'a> {
+/// An AST builder that lazily parses a string into a syntax tree.
+pub struct AstBuilder<'a> {
     /// The source string to parse.
     source: &'a str,
 
@@ -47,10 +46,10 @@ pub struct Parser<'a> {
 }
 
 /// A result type for parsing. This is a convenience type alias.
-pub type ParseResult = Result<SyntaxTree, Box<dyn Error>>;
+pub type AstBuildResult = Result<SyntaxTree, Box<dyn Error>>;
 
-impl<'a> Parser<'a> {
-    /// Creates a Parser at the beginning of the source string. This will construct a Tokenizer
+impl<'a> AstBuilder<'a> {
+    /// Creates an AstBuilder at the beginning of the source string. This will construct a Tokenizer
     /// internally.
     ///
     /// # Arguments
@@ -60,7 +59,7 @@ impl<'a> Parser<'a> {
     ///
     /// # Returns
     ///
-    /// A Parser at the beginning of the source string.
+    /// An AstBuilder at the beginning of the source string.
     pub fn new(source: &'a str, file: &'a str) -> Result<Self, Box<dyn Error>> {
         let mut tokens = Box::new(Tokenizer::new(source, file)?);
         let current_token = tokens.next().transpose()?;
@@ -72,7 +71,7 @@ impl<'a> Parser<'a> {
         })
     }
 
-    /// Creates a Parser with the provided token iterator.
+    /// Creates an AstBuilder with the provided token iterator.
     ///
     /// # Arguments
     ///
@@ -82,7 +81,7 @@ impl<'a> Parser<'a> {
     ///
     /// # Returns
     ///
-    /// A Parser with the provided tokenizer.
+    /// An AstBuilder with the provided tokenizer.
     pub fn with_tokens(source: &'a str, file: &'a str, mut tokens: Box<TokenIterator<'a>>) -> Self {
         let current_token = tokens.next().transpose().unwrap();
         Self {
@@ -94,20 +93,20 @@ impl<'a> Parser<'a> {
     }
 
     /// Parses the source string into a syntax tree.
-    pub fn parse(&mut self) -> ParseResult {
+    pub fn parse(&mut self) -> AstBuildResult {
         self.parse_file()
     }
 
     /// Parses the file rule.
     /// file -> (sequence | enum)* EOF
-    fn parse_file(&mut self) -> ParseResult {
+    fn parse_file(&mut self) -> AstBuildResult {
         let mut file = Vec::new();
         while let Some(token) = &self.current_token {
             match token.token_type {
                 TokenType::Sequence => file.push(self.parse_sequence()?),
                 TokenType::Enum => file.push(self.parse_enum()?),
                 _ => {
-                    return Err(Box::new(ParserError::UnexpectedToken {
+                    return Err(Box::new(AstBuilderError::UnexpectedToken {
                         file: self.file.to_string(),
                         token: token.clone(),
                         message: Some("Expected a sequence or enum".to_string()),
@@ -120,7 +119,7 @@ impl<'a> Parser<'a> {
 
     /// Parses the sequence rule.
     /// sequence -> "sequence" IDENTIFIER "{" (field ";")* "}"
-    fn parse_sequence(&mut self) -> ParseResult {
+    fn parse_sequence(&mut self) -> AstBuildResult {
         self.expect(TokenType::Sequence)?;
         let name = self.expect_identifier()?;
         self.expect(TokenType::OpenBrace)?;
@@ -131,7 +130,7 @@ impl<'a> Parser<'a> {
                     TokenType::Identifier(_) => fields.push(self.parse_field()?),
                     TokenType::CloseBrace => break,
                     _ => {
-                        return Err(Box::new(ParserError::UnexpectedToken {
+                        return Err(Box::new(AstBuilderError::UnexpectedToken {
                             file: self.file.to_string(),
                             token: token.clone(),
                             message: Some("Expected an identifier or right brace".to_string()),
@@ -139,7 +138,7 @@ impl<'a> Parser<'a> {
                     }
                 },
                 None => {
-                    return Err(Box::new(ParserError::UnexpectedEof {
+                    return Err(Box::new(AstBuilderError::UnexpectedEof {
                         file: self.file.to_string(),
                         line: 0,
                         column: 0,
@@ -154,7 +153,7 @@ impl<'a> Parser<'a> {
 
     /// Parses the field rule.
     /// field -> IDENTIFIER ":" type
-    fn parse_field(&mut self) -> ParseResult {
+    fn parse_field(&mut self) -> AstBuildResult {
         let name = self.expect_identifier()?;
         self.expect(TokenType::Colon)?;
         let field_type = self.parse_type()?;
@@ -163,7 +162,7 @@ impl<'a> Parser<'a> {
 
     /// Parses the enum rule.
     /// enum -> "enum" IDENTIFIER "{" (enum_entry ";")* "}"
-    fn parse_enum(&mut self) -> ParseResult {
+    fn parse_enum(&mut self) -> AstBuildResult {
         self.expect(TokenType::Enum)?;
         let name = self.expect_identifier()?;
         self.expect(TokenType::OpenBrace)?;
@@ -174,7 +173,7 @@ impl<'a> Parser<'a> {
                     TokenType::Identifier(_) => entries.push(self.parse_enum_entry()?),
                     TokenType::CloseBrace => break,
                     _ => {
-                        return Err(Box::new(ParserError::UnexpectedToken {
+                        return Err(Box::new(AstBuilderError::UnexpectedToken {
                             file: self.file.to_string(),
                             token: token.clone(),
                             message: Some("Expected an identifier or right brace".to_string()),
@@ -182,7 +181,7 @@ impl<'a> Parser<'a> {
                     }
                 },
                 None => {
-                    return Err(Box::new(ParserError::UnexpectedEof {
+                    return Err(Box::new(AstBuilderError::UnexpectedEof {
                         file: self.file.to_string(),
                         line: 0,
                         column: 0,
@@ -197,27 +196,28 @@ impl<'a> Parser<'a> {
 
     /// Parses the enum_entry rule.
     /// enum_entry -> IDENTIFIER "=" NUMBER
-    fn parse_enum_entry(&mut self) -> ParseResult {
+    fn parse_enum_entry(&mut self) -> AstBuildResult {
         let name = self.expect_identifier()?;
         self.expect(TokenType::Equals)?;
         let value = self.expect_number()?;
-        let value_num = value
-            .parse::<i32>()
-            .or(Err(Box::new(ParserError::UnexpectedToken {
-                file: self.file.to_string(),
-                token: Token {
-                    token_type: TokenType::Number(value),
-                    line: 0,
-                    column: 0,
-                },
-                message: Some("Expected a number literal".to_string()),
-            })))?;
+        let value_num =
+            value
+                .parse::<i32>()
+                .or(Err(Box::new(AstBuilderError::UnexpectedToken {
+                    file: self.file.to_string(),
+                    token: Token {
+                        token_type: TokenType::Number(value),
+                        line: 0,
+                        column: 0,
+                    },
+                    message: Some("Expected a number literal".to_string()),
+                })))?;
         Ok(SyntaxTree::EnumEntry(name, value_num))
     }
 
     /// Parses the type rule.
     /// type -> IDENTIFIER | array | oneof
-    fn parse_type(&mut self) -> ParseResult {
+    fn parse_type(&mut self) -> AstBuildResult {
         match &self.current_token {
             Some(token) => match token.token_type {
                 TokenType::Identifier(_) => {
@@ -226,13 +226,13 @@ impl<'a> Parser<'a> {
                 }
                 TokenType::OpenBracket => self.parse_array(),
                 TokenType::Oneof => self.parse_oneof(),
-                _ => Err(Box::new(ParserError::UnexpectedToken {
+                _ => Err(Box::new(AstBuilderError::UnexpectedToken {
                     file: self.file.to_string(),
                     token: token.clone(),
                     message: Some("Expected an identifier, open bracket, or oneof".to_string()),
                 })),
             },
-            None => Err(Box::new(ParserError::UnexpectedEof {
+            None => Err(Box::new(AstBuilderError::UnexpectedEof {
                 file: self.file.to_string(),
                 line: 0,
                 column: 0,
@@ -242,7 +242,7 @@ impl<'a> Parser<'a> {
 
     /// Parses the array rule.
     /// array -> "[" type "]"
-    fn parse_array(&mut self) -> ParseResult {
+    fn parse_array(&mut self) -> AstBuildResult {
         self.expect(TokenType::OpenBracket)?;
         let array_type = self.parse_type()?;
         self.expect(TokenType::CloseBracket)?;
@@ -251,7 +251,7 @@ impl<'a> Parser<'a> {
 
     /// Parses the oneof rule.
     /// oneof -> "oneof" "{" (field ";")* "}"
-    fn parse_oneof(&mut self) -> ParseResult {
+    fn parse_oneof(&mut self) -> AstBuildResult {
         self.expect(TokenType::Oneof)?;
         self.expect(TokenType::OpenBrace)?;
         let mut fields = Vec::new();
@@ -261,7 +261,7 @@ impl<'a> Parser<'a> {
                     TokenType::Identifier(_) => fields.push(self.parse_field()?),
                     TokenType::CloseBrace => break,
                     _ => {
-                        return Err(Box::new(ParserError::UnexpectedToken {
+                        return Err(Box::new(AstBuilderError::UnexpectedToken {
                             file: self.file.to_string(),
                             token: token.clone(),
                             message: Some("Expected an identifier or right brace".to_string()),
@@ -269,7 +269,7 @@ impl<'a> Parser<'a> {
                     }
                 },
                 None => {
-                    return Err(Box::new(ParserError::UnexpectedEof {
+                    return Err(Box::new(AstBuilderError::UnexpectedEof {
                         file: self.file.to_string(),
                         line: 0,
                         column: 0,
@@ -302,7 +302,7 @@ impl<'a> Parser<'a> {
         match &self.current_token {
             Some(token) => {
                 if token.token_type != token_type {
-                    return Err(Box::new(ParserError::UnexpectedToken {
+                    return Err(Box::new(AstBuilderError::UnexpectedToken {
                         file: self.file.to_string(),
                         token: token.clone(),
                         message: Some(format!("Expected a {:?}", token_type)),
@@ -312,7 +312,7 @@ impl<'a> Parser<'a> {
                 self.advance()?;
                 Ok(res)
             }
-            None => Err(Box::new(ParserError::UnexpectedEof {
+            None => Err(Box::new(AstBuilderError::UnexpectedEof {
                 file: self.file.to_string(),
                 line: 0,
                 column: 0,
@@ -334,14 +334,14 @@ impl<'a> Parser<'a> {
                     self.advance()?;
                     Ok(res)
                 } else {
-                    Err(Box::new(ParserError::UnexpectedToken {
+                    Err(Box::new(AstBuilderError::UnexpectedToken {
                         file: self.file.to_string(),
                         token: token.clone(),
                         message: Some("Expected an identifier".to_string()),
                     }))
                 }
             }
-            None => Err(Box::new(ParserError::UnexpectedEof {
+            None => Err(Box::new(AstBuilderError::UnexpectedEof {
                 file: self.file.to_string(),
                 line: 0,
                 column: 0,
@@ -364,14 +364,14 @@ impl<'a> Parser<'a> {
                     self.advance()?;
                     Ok(res)
                 } else {
-                    Err(Box::new(ParserError::UnexpectedToken {
+                    Err(Box::new(AstBuilderError::UnexpectedToken {
                         file: self.file.to_string(),
                         token: token.clone(),
                         message: Some("Expected a number literal".to_string()),
                     }))
                 }
             }
-            None => Err(Box::new(ParserError::UnexpectedEof {
+            None => Err(Box::new(AstBuilderError::UnexpectedEof {
                 file: self.file.to_string(),
                 line: 0,
                 column: 0,

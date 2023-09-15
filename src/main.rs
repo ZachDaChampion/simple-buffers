@@ -28,9 +28,9 @@ sequence Request {
 
 use std::{collections::LinkedList, error::Error};
 
-use parser::SyntaxTree;
+use ast::SyntaxTree;
 
-mod parser;
+mod ast;
 mod tokenizer;
 
 fn main() {
@@ -45,7 +45,7 @@ enum Visitor<'a> {
 }
 
 fn print_ast() -> Result<(), Box<dyn Error>> {
-    let mut parser = parser::Parser::new(SOURCE, "test.sbz").expect("Failed to create parser");
+    let mut parser = ast::AstBuilder::new(SOURCE, "test.sbz").expect("Failed to create parser");
 
     let ast = parser.parse()?;
     let mut stack = LinkedList::new();
