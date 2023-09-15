@@ -41,14 +41,14 @@ impl fmt::Display for TokenizerError {
         };
 
         // Get the length of the line number when printed as a string.
-        let line_num_len = self.line.to_string().len();
+        let line_num_len = self.line.to_string().len() + 3;
 
         // Determine how the maximum length of the excerpt that will be displayed. If there is no
         // terminal width, display the entire excerpt.
         let excerpt_width = if term_width == 0 {
             self.excerpt.len()
         } else {
-            term_width as usize - line_num_len - 2
+            term_width as usize - line_num_len
         };
 
         // Truncate the excerpt if it is too long, padding both sides with ellipses.
@@ -77,11 +77,11 @@ impl fmt::Display for TokenizerError {
         let excerpt = format!("{}{}{}", overflow_left, except_slice, overflow_right);
         let pointer = format!(
             "{}{}",
-            " ".repeat(self.column - 1 + line_num_len + 2),
+            " ".repeat(self.column - 1 + line_num_len),
             "^".yellow()
         );
         let problem_char = self.excerpt.chars().nth(self.column - 1);
-        let excerpt_prefix = format!("{}: ", self.line).cyan();
+        let excerpt_prefix = format!("{} | ", self.line).cyan();
 
         // Construct the error message.
         match problem_char {

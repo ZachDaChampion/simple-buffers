@@ -8,8 +8,8 @@ type OptionalTokenGenerator = Option<fn(String) -> TokenType>;
 lazy_static! {
     static ref SPEC: Vec<(&'static Regex, OptionalTokenGenerator)> = vec![
         (regex!(r"^\s+"), None), // Ignore whitespace
-        (regex!(r"^struct"), Some(|_| TokenType::Struct)), // Capture struct keyword
-        (regex!(r"^union"), Some(|_| TokenType::Union)), // Capture union keyword
+        (regex!(r"^sequence"), Some(|_| TokenType::Sequence)), // Capture sequence keyword
+        (regex!(r"^oneof"), Some(|_| TokenType::Oneof)), // Capture oneof keyword
         (regex!(r"^enum"), Some(|_| TokenType::Enum)), // Capture enum keyword
         (regex!(r"^\{"), Some(|_| TokenType::OpenBrace)), // Capture opening brace
         (regex!(r"^\}"), Some(|_| TokenType::CloseBrace)), // Capture closing brace
@@ -31,11 +31,11 @@ lazy_static! {
 /// A specific token type and associated data.
 #[derive(Clone, Debug, PartialEq)]
 pub enum TokenType {
-    /// A 'struct' keyword.
-    Struct,
+    /// A 'sequence' keyword.
+    Sequence,
 
-    /// A `union` keyword.
-    Union,
+    /// A `oneof` keyword.
+    Oneof,
 
     /// A `enum` keyword.
     Enum,
