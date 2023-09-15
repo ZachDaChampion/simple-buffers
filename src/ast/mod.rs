@@ -106,7 +106,10 @@ impl<'a> AstBuilder<'a> {
         loop {
             match &self.current_token {
                 Some(token) => match token.token_type {
-                    TokenType::Identifier(_) => fields.push(self.parse_field()?),
+                    TokenType::Identifier(_) => {
+                        fields.push(self.parse_field()?);
+                        self.expect(TokenType::Semicolon)?;
+                    }
                     TokenType::CloseBrace => break,
                     _ => {
                         return Err(Box::new(AstBuilderError::UnexpectedToken {
@@ -124,7 +127,6 @@ impl<'a> AstBuilder<'a> {
                     }))
                 }
             }
-            self.advance()?;
         }
         self.expect(TokenType::CloseBrace)?;
         Ok(SyntaxTree::Sequence(name, fields))
@@ -149,7 +151,10 @@ impl<'a> AstBuilder<'a> {
         loop {
             match &self.current_token {
                 Some(token) => match token.token_type {
-                    TokenType::Identifier(_) => entries.push(self.parse_enum_entry()?),
+                    TokenType::Identifier(_) => {
+                        entries.push(self.parse_enum_entry()?);
+                        self.expect(TokenType::Semicolon)?;
+                    }
                     TokenType::CloseBrace => break,
                     _ => {
                         return Err(Box::new(AstBuilderError::UnexpectedToken {
@@ -167,7 +172,6 @@ impl<'a> AstBuilder<'a> {
                     }))
                 }
             }
-            self.advance()?;
         }
         self.expect(TokenType::CloseBrace)?;
         Ok(SyntaxTree::Enum(name, entries))
@@ -237,7 +241,10 @@ impl<'a> AstBuilder<'a> {
         loop {
             match &self.current_token {
                 Some(token) => match token.token_type {
-                    TokenType::Identifier(_) => fields.push(self.parse_field()?),
+                    TokenType::Identifier(_) => {
+                        fields.push(self.parse_field()?);
+                        self.expect(TokenType::Semicolon)?;
+                    }
                     TokenType::CloseBrace => break,
                     _ => {
                         return Err(Box::new(AstBuilderError::UnexpectedToken {
@@ -255,7 +262,6 @@ impl<'a> AstBuilder<'a> {
                     }))
                 }
             }
-            self.advance()?;
         }
         self.expect(TokenType::CloseBrace)?;
         Ok(SyntaxTree::Oneof(fields))
