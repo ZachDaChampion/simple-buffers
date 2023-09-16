@@ -1,41 +1,15 @@
-const SOURCE: &str = r"enum Error {
-    Ok = 0;
-    InvalidRequest = 1;
-}
-
-// this is a comment
-sequence MoveToEntry {
-    id: u8; // another
-    dest: f32;
-    speed: f32;
-}
-
-sequence MoveTo {
-    entries: [MoveToEntry];
-}
-
-sequence Init {
-    expected_fw_version: u32;
-}
-
-sequence Request {
-    request_id: u32;
-    payload: oneof {
-        init: Init;
-        move_to: MoveTo;
-    };
-}";
-
-use std::{collections::LinkedList, error::Error};
-
 use ast::SyntaxTree;
+use std::{collections::LinkedList, error::Error};
 
 mod ast;
 mod tokenizer;
 
 fn main() {
-    if let Err(e) = print_ast() {
-        println!("Error: {}", e);
+    // Load test.sb into a string.
+    let source = std::fs::read_to_string("test.sb").expect("Failed to read test.sb");
+
+    if let Err(e) = print_ast(source) {
+        println!("\n{}\n", e);
     }
 }
 
@@ -44,8 +18,9 @@ enum Visitor<'a> {
     Cleanup(&'a SyntaxTree),
 }
 
-fn print_ast() -> Result<(), Box<dyn Error>> {
-    let mut parser = ast::AstBuilder::new(SOURCE, "test.sbz").expect("Failed to create parser");
+fn print_ast(source: String) -> Result<(), Box<dyn Error>> {
+    let mut parser =
+        ast::AstBuilder::new(source.as_str(), "test.sb").expect("Failed to create parser");
 
     let ast = parser.parse()?;
     let mut stack = LinkedList::new();

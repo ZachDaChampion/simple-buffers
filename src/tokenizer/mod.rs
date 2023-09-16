@@ -1,8 +1,10 @@
 pub mod error;
 
+use colored::Colorize;
 use lazy_static::lazy_static;
 use regex::Regex;
 use regex_macro::regex;
+use std::fmt;
 
 use error::TokenizerError;
 
@@ -43,17 +45,160 @@ pub enum TokenType {
     Identifier(String),
 }
 
+impl TokenType {
+    /// Returns the width of the token in characters.
+    pub fn width(&self) -> usize {
+        match self {
+            TokenType::Sequence => "sequence".len(),
+            TokenType::Oneof => "oneof".len(),
+            TokenType::Enum => "enum".len(),
+            TokenType::OpenBrace => "{".len(),
+            TokenType::CloseBrace => "}".len(),
+            TokenType::OpenBracket => "[".len(),
+            TokenType::CloseBracket => "]".len(),
+            TokenType::Colon => ":".len(),
+            TokenType::Semicolon => ";".len(),
+            TokenType::Equals => "=".len(),
+            TokenType::Number(val) => val.len(),
+            TokenType::Identifier(val) => val.len(),
+        }
+    }
+}
+
+impl fmt::Display for TokenType {
+    /// Displays the token type in a human-readable format.
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            TokenType::Sequence => write!(f, "sequence"),
+            TokenType::Oneof => write!(f, "oneof"),
+            TokenType::Enum => write!(f, "enum"),
+            TokenType::OpenBrace => write!(f, "{{"),
+            TokenType::CloseBrace => write!(f, "}}"),
+            TokenType::OpenBracket => write!(f, "["),
+            TokenType::CloseBracket => write!(f, "]"),
+            TokenType::Colon => write!(f, ":"),
+            TokenType::Semicolon => write!(f, ";"),
+            TokenType::Equals => write!(f, "="),
+            TokenType::Number(val) => write!(f, "{}", val),
+            TokenType::Identifier(val) => write!(f, "{}", val),
+        }
+    }
+}
+
+/// Information needed to locate a token in the source string.
+#[derive(Clone, Debug, PartialEq)]
+pub struct TokenLocation {
+    /// The name of the file where the token was found.
+    pub file: String,
+
+    /// The line number where the token was found (0-indexed).
+    pub line_num: usize,
+
+    /// The column number where the token was found (0-indexed).
+    pub col_num: usize,
+
+    /// The width of the token in characters.
+    pub width: usize,
+
+    /// The line above the line where the token was found.
+    pub prev_line_text: Option<String>,
+
+    /// The line of text where the token was found.
+    pub line_text: String,
+
+    /// The line below the line where the token was found.
+    pub next_line_text: Option<String>,
+}
+
+impl fmt::Display for TokenLocation {
+    /// Displays the token location in a human-readable format with context.
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        // Print the file name, line number, and column number.
+        let path = format!("{}:{}:{}", self.file, self.line_num + 1, self.col_num + 1);
+        write!(
+            f,
+            "  {arrow} {path}",
+            arrow = "-->".cyan().bold(),
+            path = path.green().underline(),
+        )?;
+
+        writeln!(f)?;
+
+        // Figure out how wide the line number will be when it is displayed in the error message.
+        // This will be the widest of the three displayed lines. For instance:
+        //
+        //     9  | let x = 1;
+        //     10 | let y = 2;
+        //     11 | let z = 3;
+        //     ^^^^^
+        //    width=5
+        let line_num_dis_width = if self.next_line_text.is_some() {
+            (self.line_num + 2).to_string().len()
+        } else {
+            (self.line_num + 1).to_string().len()
+        };
+
+        // Construct an arrow pointing to the problematic token.
+        let arrow_str = format!("{}{}", " ".repeat(self.col_num), "^".repeat(self.width));
+
+        // Display lines of code around the problematic token.
+        for (i, line_str) in [
+            self.prev_line_text.as_ref(),
+            Some(&self.line_text),
+            self.next_line_text.as_ref(),
+        ]
+        .iter()
+        .enumerate()
+        {
+            if let Some(line_str) = line_str {
+                if i == 0 {
+                    write!(
+                        f,
+                        "\n{padding} {cyan_bar}",
+                        padding = " ".repeat(line_num_dis_width),
+                        cyan_bar = "|".cyan().bold(),
+                    )?;
+                }
+                write!(
+                    f,
+                    "\n{line_num: >width$} {cyan_bar} {line_str}",
+                    line_num = (self.line_num + i).to_string().cyan().bold(),
+                    width = line_num_dis_width,
+                    cyan_bar = "|".cyan().bold(),
+                    line_str = line_str,
+                )?;
+                if i == 1 {
+                    write!(
+                        f,
+                        "\n{padding} {cyan_bar} {arrow_str}",
+                        padding = " ".repeat(line_num_dis_width),
+                        cyan_bar = "|".cyan().bold(),
+                        arrow_str = arrow_str.yellow(),
+                    )?;
+                }
+                if i == 2 {
+                    write!(
+                        f,
+                        "\n{padding} {cyan_bar}",
+                        padding = " ".repeat(line_num_dis_width),
+                        cyan_bar = "|".cyan().bold(),
+                    )?;
+                }
+            }
+        }
+
+        Ok(())
+    }
+}
+
 /// A token in the input stream.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Token {
     /// The type of the token.
     pub token_type: TokenType,
 
-    /// The line number where the token was found.
-    pub line: usize,
-
-    /// The column number where the token was found.
-    pub column: usize,
+    /// The location of the token in the source string.
+    pub location: TokenLocation,
 }
 
 /// A tokenizer that lazily tokenizes a string.
@@ -67,14 +212,27 @@ pub struct Tokenizer<'a> {
     /// The next token in the source string.
     next_token: Option<Token>,
 
-    /// The current line number.
-    line: usize,
-
-    /// The current column number.
-    column: usize,
-
     /// The current position in the source string.
     cursor: usize,
+
+    /// The current line number (0-indexed).
+    line_num: usize,
+
+    /// The current column number (0-indexed).
+    col_num: usize,
+
+    /// An iterator over the lines of the source string. This is used to display context when an
+    /// error occurs.
+    lines_iter: std::str::Lines<'a>,
+
+    /// The previous line of text. This is used to display context when an error occurs.
+    prev_line_text: Option<&'a str>,
+
+    /// The current line of text. This is used to display context when an error occurs.
+    line_text: Option<&'a str>,
+
+    /// The next line of text. This is used to display context when an error occurs.
+    next_line_text: Option<&'a str>,
 }
 
 impl<'a> Tokenizer<'a> {
@@ -85,13 +243,21 @@ impl<'a> Tokenizer<'a> {
     /// * `source` - The source string to tokenize.
     /// * `file` - The name of the file being tokenized.
     pub fn new(source: &'a str, file: &'a str) -> Result<Self, TokenizerError> {
+        let mut lines_iter = source.lines();
+        let first_line = lines_iter.next();
+        let second_line = lines_iter.next();
+
         let mut tokenizer = Self {
             source,
             file,
             next_token: None,
-            line: 1,
-            column: 1,
             cursor: 0,
+            line_num: 0,
+            col_num: 0,
+            lines_iter,
+            prev_line_text: None,
+            line_text: first_line,
+            next_line_text: second_line,
         };
         tokenizer.advance(true)?;
 
@@ -140,19 +306,32 @@ impl<'a> Tokenizer<'a> {
                     if let Some(token_fn) = token_fn {
                         let token_type = token_fn(val.as_str().to_string());
                         self.next_token = Some(Token {
-                            token_type,
-                            line: self.line,
-                            column: self.column,
+                            token_type: token_type.clone(),
+                            location: TokenLocation {
+                                file: self.file.to_string(),
+                                line_num: self.line_num,
+                                col_num: self.col_num,
+                                width: token_type.width(),
+                                prev_line_text: self.prev_line_text.map(|s| s.to_string()),
+                                line_text: self
+                                    .line_text
+                                    .unwrap_or("!! LINE COULD NOT BE FOUND !!")
+                                    .to_string(),
+                                next_line_text: self.next_line_text.map(|s| s.to_string()),
+                            },
                         });
                     }
 
                     // Count newlines and columns
                     for c in val.as_str().chars() {
                         if c == '\n' {
-                            self.line += 1;
-                            self.column = 1;
+                            self.line_num += 1;
+                            self.col_num = 0;
+                            self.prev_line_text = self.line_text;
+                            self.line_text = self.next_line_text;
+                            self.next_line_text = self.lines_iter.next();
                         } else {
-                            self.column += 1;
+                            self.col_num += 1;
                         }
                     }
 
@@ -167,17 +346,19 @@ impl<'a> Tokenizer<'a> {
         }
 
         // If no patterns match, return an error
-        let slice_before = &self.source[..self.cursor];
-        let slice_after = &self.source[self.cursor..];
-        let line_start = slice_before.rfind('\n').map_or(0, |i| i + 1);
-        let line_end = slice_after.find('\n').unwrap_or(slice_after.len()) + self.cursor;
         self.next_token = None;
-        Err(TokenizerError::new(
-            self.file.to_string(),
-            self.line,
-            self.column,
-            self.source[line_start..line_end].to_string(),
-        ))
+        Err(TokenizerError::new(TokenLocation {
+            file: self.file.to_string(),
+            line_num: self.line_num,
+            col_num: self.col_num,
+            width: 1,
+            prev_line_text: self.prev_line_text.map(|s| s.to_string()),
+            line_text: self
+                .line_text
+                .unwrap_or("!! LINE COULD NOT BE FOUND !!")
+                .to_string(),
+            next_line_text: self.next_line_text.map(|s| s.to_string()),
+        }))
     }
 }
 

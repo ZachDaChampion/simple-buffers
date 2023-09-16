@@ -13,7 +13,9 @@
 
 use std::error::Error;
 
-use crate::tokenizer::{Token, TokenIterator, TokenType, Tokenizer};
+use colored::Colorize;
+
+use crate::tokenizer::{Token, TokenIterator, TokenLocation, TokenType, Tokenizer};
 
 use self::error::AstBuilderError;
 
@@ -32,9 +34,6 @@ pub enum SyntaxTree {
 
 /// An AST builder that lazily parses a string into a syntax tree.
 pub struct AstBuilder<'a> {
-    /// The source string to parse.
-    source: &'a str,
-
     /// The name of the file being parsed.
     file: &'a str,
 
@@ -64,7 +63,6 @@ impl<'a> AstBuilder<'a> {
         let mut tokens = Box::new(Tokenizer::new(source, file)?);
         let current_token = tokens.next().transpose()?;
         Ok(Self {
-            source,
             file,
             tokens,
             current_token,
@@ -86,9 +84,8 @@ impl<'a> AstBuilder<'a> {
                 TokenType::Enum => file.push(self.parse_enum()?),
                 _ => {
                     return Err(Box::new(AstBuilderError::UnexpectedToken {
-                        file: self.file.to_string(),
                         token: token.clone(),
-                        message: Some("Expected a sequence or enum".to_string()),
+                        message: Some("expected a \"sequence\" or \"enum\"".to_string()),
                     }))
                 }
             }
@@ -113,17 +110,14 @@ impl<'a> AstBuilder<'a> {
                     TokenType::CloseBrace => break,
                     _ => {
                         return Err(Box::new(AstBuilderError::UnexpectedToken {
-                            file: self.file.to_string(),
                             token: token.clone(),
-                            message: Some("Expected an identifier or right brace".to_string()),
+                            message: Some("expected an identifier or \"}\"".to_string()),
                         }))
                     }
                 },
                 None => {
                     return Err(Box::new(AstBuilderError::UnexpectedEof {
                         file: self.file.to_string(),
-                        line: 0,
-                        column: 0,
                     }))
                 }
             }
@@ -158,17 +152,14 @@ impl<'a> AstBuilder<'a> {
                     TokenType::CloseBrace => break,
                     _ => {
                         return Err(Box::new(AstBuilderError::UnexpectedToken {
-                            file: self.file.to_string(),
                             token: token.clone(),
-                            message: Some("Expected an identifier or right brace".to_string()),
+                            message: Some("expected an identifier or \"}\"".to_string()),
                         }))
                     }
                 },
                 None => {
                     return Err(Box::new(AstBuilderError::UnexpectedEof {
                         file: self.file.to_string(),
-                        line: 0,
-                        column: 0,
                     }))
                 }
             }
@@ -187,13 +178,19 @@ impl<'a> AstBuilder<'a> {
             value
                 .parse::<i32>()
                 .or(Err(Box::new(AstBuilderError::UnexpectedToken {
-                    file: self.file.to_string(),
                     token: Token {
                         token_type: TokenType::Number(value),
-                        line: 0,
-                        column: 0,
+                        location: TokenLocation {
+                            file: self.file.to_string(),
+                            line_num: 0,
+                            col_num: 0,
+                            width: 0,
+                            prev_line_text: None,
+                            line_text: "".to_string(),
+                            next_line_text: None,
+                        },
                     },
-                    message: Some("Expected a number literal".to_string()),
+                    message: Some("expected a number literal".to_string()),
                 })))?;
         Ok(SyntaxTree::EnumEntry(name, value_num))
     }
@@ -210,15 +207,12 @@ impl<'a> AstBuilder<'a> {
                 TokenType::OpenBracket => self.parse_array(),
                 TokenType::Oneof => self.parse_oneof(),
                 _ => Err(Box::new(AstBuilderError::UnexpectedToken {
-                    file: self.file.to_string(),
                     token: token.clone(),
-                    message: Some("Expected an identifier, open bracket, or oneof".to_string()),
+                    message: Some("expected a type or \"oneof\"".to_string()),
                 })),
             },
             None => Err(Box::new(AstBuilderError::UnexpectedEof {
                 file: self.file.to_string(),
-                line: 0,
-                column: 0,
             })),
         }
     }
@@ -248,17 +242,14 @@ impl<'a> AstBuilder<'a> {
                     TokenType::CloseBrace => break,
                     _ => {
                         return Err(Box::new(AstBuilderError::UnexpectedToken {
-                            file: self.file.to_string(),
                             token: token.clone(),
-                            message: Some("Expected an identifier or right brace".to_string()),
+                            message: Some("expected an identifier or \"}\"".to_string()),
                         }))
                     }
                 },
                 None => {
                     return Err(Box::new(AstBuilderError::UnexpectedEof {
                         file: self.file.to_string(),
-                        line: 0,
-                        column: 0,
                     }))
                 }
             }
@@ -288,9 +279,8 @@ impl<'a> AstBuilder<'a> {
             Some(token) => {
                 if token.token_type != token_type {
                     return Err(Box::new(AstBuilderError::UnexpectedToken {
-                        file: self.file.to_string(),
                         token: token.clone(),
-                        message: Some(format!("Expected a {:?}", token_type)),
+                        message: Some(format!("expected: \"{}\"", token_type.to_string().bold())),
                     }));
                 }
                 let res = token.clone();
@@ -299,8 +289,6 @@ impl<'a> AstBuilder<'a> {
             }
             None => Err(Box::new(AstBuilderError::UnexpectedEof {
                 file: self.file.to_string(),
-                line: 0,
-                column: 0,
             })),
         }
     }
@@ -320,16 +308,13 @@ impl<'a> AstBuilder<'a> {
                     Ok(res)
                 } else {
                     Err(Box::new(AstBuilderError::UnexpectedToken {
-                        file: self.file.to_string(),
                         token: token.clone(),
-                        message: Some("Expected an identifier".to_string()),
+                        message: Some("expected an identifier".to_string()),
                     }))
                 }
             }
             None => Err(Box::new(AstBuilderError::UnexpectedEof {
                 file: self.file.to_string(),
-                line: 0,
-                column: 0,
             })),
         }
     }
@@ -350,16 +335,13 @@ impl<'a> AstBuilder<'a> {
                     Ok(res)
                 } else {
                     Err(Box::new(AstBuilderError::UnexpectedToken {
-                        file: self.file.to_string(),
                         token: token.clone(),
-                        message: Some("Expected a number literal".to_string()),
+                        message: Some("expected a number literal".to_string()),
                     }))
                 }
             }
             None => Err(Box::new(AstBuilderError::UnexpectedEof {
                 file: self.file.to_string(),
-                line: 0,
-                column: 0,
             })),
         }
     }

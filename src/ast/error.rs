@@ -8,9 +8,6 @@ use crate::tokenizer::Token;
 pub enum AstBuilderError {
     /// An unexpected token was encountered.
     UnexpectedToken {
-        /// The file where the unexpected token was encountered.
-        file: String,
-
         /// The token that was encountered.
         token: Token,
 
@@ -22,12 +19,6 @@ pub enum AstBuilderError {
     UnexpectedEof {
         /// The file where the unexpected end of file was encountered.
         file: String,
-
-        /// The line number where the unexpected end of file was encountered.
-        line: usize,
-
-        /// The column number where the unexpected end of file was encountered.
-        column: usize,
     },
 }
 
@@ -36,30 +27,32 @@ impl std::error::Error for AstBuilderError {}
 impl fmt::Display for AstBuilderError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::UnexpectedToken {
-                file,
-                token,
-                message,
-            } => {
-                let mut msg = format!(
-                    "Unexpected token {token:?} in {file} at line {line}, column {col}",
-                    token = token.token_type,
-                    file = file.green(),
-                    line = token.line.to_string().cyan(),
-                    col = token.column.to_string().yellow(),
-                );
+            Self::UnexpectedToken { token, message } => {
                 if let Some(message) = message {
-                    msg.push_str(&format!(" ({})", message));
+                    write!(
+                        f,
+                        "{error_str} Unexpected token `{token}` ({message})\n{location}",
+                        error_str = "ERROR:".red().bold(),
+                        token = token.token_type.to_string().blue().bold(),
+                        message = message,
+                        location = token.location,
+                    )
+                } else {
+                    write!(
+                        f,
+                        "{error_str} Unexpected token `{token}`\n{location}",
+                        error_str = "ERROR:".red().bold(),
+                        token = token.token_type.to_string().blue().bold(),
+                        location = token.location,
+                    )
                 }
-                write!(f, "{}", msg)
             }
 
-            Self::UnexpectedEof { file, line, column } => write!(
+            Self::UnexpectedEof { file } => write!(
                 f,
-                "Unexpected end of file in {file} at line {line}, column {col}",
-                file = file.green(),
-                line = line.to_string().cyan(),
-                col = column.to_string().yellow(),
+                "{error_str} Unexpected end of file in {file}",
+                error_str = "ERROR:".red().bold(),
+                file = file.green().underline(),
             ),
         }
     }
