@@ -87,9 +87,9 @@ impl fmt::Display for TokenType {
 
 /// Information needed to locate a token in the source string.
 #[derive(Clone, Debug, PartialEq)]
-pub struct TokenLocation {
+pub struct TokenLocation<'a> {
     /// The name of the file where the token was found.
-    pub file: String,
+    pub file: &'a str,
 
     /// The line number where the token was found (0-indexed).
     pub line_num: usize,
@@ -101,16 +101,16 @@ pub struct TokenLocation {
     pub width: usize,
 
     /// The line above the line where the token was found.
-    pub prev_line_text: Option<String>,
+    pub prev_line_text: Option<&'a str>,
 
     /// The line of text where the token was found.
-    pub line_text: String,
+    pub line_text: Option<&'a str>,
 
     /// The line below the line where the token was found.
-    pub next_line_text: Option<String>,
+    pub next_line_text: Option<&'a str>,
 }
 
-impl fmt::Display for TokenLocation {
+impl<'a> fmt::Display for TokenLocation<'a> {
     /// Displays the token location in a human-readable format with context.
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         // Print the file name, line number, and column number.
@@ -144,7 +144,7 @@ impl fmt::Display for TokenLocation {
         // Display lines of code around the problematic token.
         for (i, line_str) in [
             self.prev_line_text.as_ref(),
-            Some(&self.line_text),
+            self.line_text.as_ref(),
             self.next_line_text.as_ref(),
         ]
         .iter()
@@ -193,12 +193,12 @@ impl fmt::Display for TokenLocation {
 
 /// A token in the input stream.
 #[derive(Clone, Debug, PartialEq)]
-pub struct Token {
+pub struct Token<'a> {
     /// The type of the token.
     pub token_type: TokenType,
 
     /// The location of the token in the source string.
-    pub location: TokenLocation,
+    pub location: TokenLocation<'a>,
 }
 
 /// A tokenizer that lazily tokenizes a string.
@@ -210,7 +210,7 @@ pub struct Tokenizer<'a> {
     file: &'a str,
 
     /// The next token in the source string.
-    next_token: Option<Token>,
+    next_token: Option<Token<'a>>,
 
     /// The current position in the source string.
     cursor: usize,
@@ -269,7 +269,7 @@ impl<'a> Tokenizer<'a> {
     /// # Returns
     ///
     /// * `Some(token)` if there is a next token, `None` otherwise.
-    pub fn pop(&mut self) -> Result<Option<Token>, TokenizerError> {
+    pub fn pop(&mut self) -> Result<Option<Token<'a>>, TokenizerError> {
         let token = self.next_token.clone();
         self.advance(false)?;
         Ok(token)
@@ -308,16 +308,13 @@ impl<'a> Tokenizer<'a> {
                         self.next_token = Some(Token {
                             token_type: token_type.clone(),
                             location: TokenLocation {
-                                file: self.file.to_string(),
+                                file: self.file,
                                 line_num: self.line_num,
                                 col_num: self.col_num,
                                 width: token_type.width(),
-                                prev_line_text: self.prev_line_text.map(|s| s.to_string()),
-                                line_text: self
-                                    .line_text
-                                    .unwrap_or("!! LINE COULD NOT BE FOUND !!")
-                                    .to_string(),
-                                next_line_text: self.next_line_text.map(|s| s.to_string()),
+                                prev_line_text: self.prev_line_text,
+                                line_text: self.line_text,
+                                next_line_text: self.next_line_text,
                             },
                         });
                     }
@@ -347,24 +344,21 @@ impl<'a> Tokenizer<'a> {
 
         // If no patterns match, return an error
         self.next_token = None;
-        Err(TokenizerError::new(TokenLocation {
-            file: self.file.to_string(),
+        Err(TokenizerError::new(&TokenLocation {
+            file: self.file,
             line_num: self.line_num,
             col_num: self.col_num,
             width: 1,
-            prev_line_text: self.prev_line_text.map(|s| s.to_string()),
-            line_text: self
-                .line_text
-                .unwrap_or("!! LINE COULD NOT BE FOUND !!")
-                .to_string(),
-            next_line_text: self.next_line_text.map(|s| s.to_string()),
+            prev_line_text: self.prev_line_text,
+            line_text: self.line_text,
+            next_line_text: self.next_line_text,
         }))
     }
 }
 
-pub type TokenIterator<'a> = dyn Iterator<Item = Result<Token, TokenizerError>> + 'a;
-impl Iterator for Tokenizer<'_> {
-    type Item = Result<Token, TokenizerError>;
+pub type TokenIterator<'a> = dyn Iterator<Item = Result<Token<'a>, TokenizerError>> + 'a;
+impl<'a> Iterator for Tokenizer<'a> {
+    type Item = Result<Token<'a>, TokenizerError>;
 
     fn next(&mut self) -> Option<Self::Item> {
         self.pop().transpose()

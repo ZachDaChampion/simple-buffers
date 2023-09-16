@@ -41,7 +41,7 @@ pub struct AstBuilder<'a> {
     tokens: Box<TokenIterator<'a>>,
 
     /// The current token.
-    current_token: Option<Token>,
+    current_token: Option<Token<'a>>,
 }
 
 /// A result type for parsing. This is a convenience type alias.
@@ -83,10 +83,10 @@ impl<'a> AstBuilder<'a> {
                 TokenType::Sequence => file.push(self.parse_sequence()?),
                 TokenType::Enum => file.push(self.parse_enum()?),
                 _ => {
-                    return Err(Box::new(AstBuilderError::UnexpectedToken {
-                        token: token.clone(),
-                        message: Some("expected a \"sequence\" or \"enum\"".to_string()),
-                    }))
+                    return Err(Box::new(AstBuilderError::unexpected_token(
+                        token,
+                        Some("expected a \"sequence\" or \"enum\"".to_string()),
+                    )));
                 }
             }
         }
@@ -109,10 +109,10 @@ impl<'a> AstBuilder<'a> {
                     }
                     TokenType::CloseBrace => break,
                     _ => {
-                        return Err(Box::new(AstBuilderError::UnexpectedToken {
-                            token: token.clone(),
-                            message: Some("expected an identifier or \"}\"".to_string()),
-                        }))
+                        return Err(Box::new(AstBuilderError::unexpected_token(
+                            token,
+                            Some("expected an identifier or \"}\"".to_string()),
+                        )));
                     }
                 },
                 None => {
@@ -151,10 +151,10 @@ impl<'a> AstBuilder<'a> {
                     }
                     TokenType::CloseBrace => break,
                     _ => {
-                        return Err(Box::new(AstBuilderError::UnexpectedToken {
-                            token: token.clone(),
-                            message: Some("expected an identifier or \"}\"".to_string()),
-                        }))
+                        return Err(Box::new(AstBuilderError::unexpected_token(
+                            token,
+                            Some("expected an identifier or \"}\"".to_string()),
+                        )));
                     }
                 },
                 None => {
@@ -177,21 +177,21 @@ impl<'a> AstBuilder<'a> {
         let value_num =
             value
                 .parse::<i32>()
-                .or(Err(Box::new(AstBuilderError::UnexpectedToken {
-                    token: Token {
+                .or(Err(Box::new(AstBuilderError::unexpected_token(
+                    &Token {
                         token_type: TokenType::Number(value),
                         location: TokenLocation {
-                            file: self.file.to_string(),
+                            file: self.file,
                             line_num: 0,
                             col_num: 0,
                             width: 0,
                             prev_line_text: None,
-                            line_text: "".to_string(),
+                            line_text: None,
                             next_line_text: None,
                         },
                     },
-                    message: Some("expected a number literal".to_string()),
-                })))?;
+                    Some("expected a number literal".to_string()),
+                ))))?;
         Ok(SyntaxTree::EnumEntry(name, value_num))
     }
 
@@ -206,10 +206,10 @@ impl<'a> AstBuilder<'a> {
                 }
                 TokenType::OpenBracket => self.parse_array(),
                 TokenType::Oneof => self.parse_oneof(),
-                _ => Err(Box::new(AstBuilderError::UnexpectedToken {
-                    token: token.clone(),
-                    message: Some("expected a type or \"oneof\"".to_string()),
-                })),
+                _ => Err(Box::new(AstBuilderError::unexpected_token(
+                    token,
+                    Some("expected a type or \"oneof\"".to_string()),
+                ))),
             },
             None => Err(Box::new(AstBuilderError::UnexpectedEof {
                 file: self.file.to_string(),
@@ -241,10 +241,10 @@ impl<'a> AstBuilder<'a> {
                     }
                     TokenType::CloseBrace => break,
                     _ => {
-                        return Err(Box::new(AstBuilderError::UnexpectedToken {
-                            token: token.clone(),
-                            message: Some("expected an identifier or \"}\"".to_string()),
-                        }))
+                        return Err(Box::new(AstBuilderError::unexpected_token(
+                            token,
+                            Some("expected an identifier or \"}\"".to_string()),
+                        )));
                     }
                 },
                 None => {
@@ -278,10 +278,10 @@ impl<'a> AstBuilder<'a> {
         match &self.current_token {
             Some(token) => {
                 if token.token_type != token_type {
-                    return Err(Box::new(AstBuilderError::UnexpectedToken {
-                        token: token.clone(),
-                        message: Some(format!("expected: \"{}\"", token_type.to_string().bold())),
-                    }));
+                    return Err(Box::new(AstBuilderError::unexpected_token(
+                        token,
+                        Some(format!("expected: \"{}\"", token_type.to_string().bold())),
+                    )));
                 }
                 let res = token.clone();
                 self.advance()?;
@@ -307,10 +307,10 @@ impl<'a> AstBuilder<'a> {
                     self.advance()?;
                     Ok(res)
                 } else {
-                    Err(Box::new(AstBuilderError::UnexpectedToken {
-                        token: token.clone(),
-                        message: Some("expected an identifier".to_string()),
-                    }))
+                    Err(Box::new(AstBuilderError::unexpected_token(
+                        token,
+                        Some("expected an identifier".to_string()),
+                    )))
                 }
             }
             None => Err(Box::new(AstBuilderError::UnexpectedEof {
@@ -334,10 +334,10 @@ impl<'a> AstBuilder<'a> {
                     self.advance()?;
                     Ok(res)
                 } else {
-                    Err(Box::new(AstBuilderError::UnexpectedToken {
-                        token: token.clone(),
-                        message: Some("expected a number literal".to_string()),
-                    }))
+                    Err(Box::new(AstBuilderError::unexpected_token(
+                        token,
+                        Some("expected a number literal".to_string()),
+                    )))
                 }
             }
             None => Err(Box::new(AstBuilderError::UnexpectedEof {
