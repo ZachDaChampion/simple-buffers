@@ -1,4 +1,4 @@
-use ast::SyntaxTree;
+use ast::{SyntaxTree, TaggedSyntaxTree};
 use std::{collections::LinkedList, error::Error};
 
 mod ast;
@@ -15,8 +15,8 @@ fn main() {
 }
 
 enum Visitor<'a> {
-    Visit(&'a SyntaxTree),
-    Cleanup(&'a SyntaxTree),
+    Visit(&'a TaggedSyntaxTree<'a>),
+    Cleanup(&'a TaggedSyntaxTree<'a>),
 }
 
 fn print_ast(source: String) -> Result<(), Box<dyn Error>> {
@@ -32,7 +32,7 @@ fn print_ast(source: String) -> Result<(), Box<dyn Error>> {
         match action {
             Visitor::Visit(node) => {
                 print!("{}", "|  ".repeat(indent));
-                match node {
+                match &node.data {
                     SyntaxTree::File(children) => {
                         println!("File");
                         stack.push_back(Visitor::Cleanup(node));
@@ -87,7 +87,7 @@ fn print_ast(source: String) -> Result<(), Box<dyn Error>> {
                     }
                 }
             }
-            Visitor::Cleanup(node) => match node {
+            Visitor::Cleanup(node) => match node.data {
                 SyntaxTree::File(_)
                 | SyntaxTree::Sequence(_, _)
                 | SyntaxTree::Field(_, _)

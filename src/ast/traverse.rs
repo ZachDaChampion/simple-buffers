@@ -1,10 +1,10 @@
-use super::SyntaxTree;
+use super::{SyntaxTree, TaggedSyntaxTree};
 use std::collections::VecDeque;
 
 /// An iterator over the direct children of a SyntaxTree.
 struct Children<'a> {
     /// The tree whose children are being iterated over.
-    tree: &'a SyntaxTree,
+    tree: &'a TaggedSyntaxTree<'a>,
 
     /// The index of the next child to return when iterating forward.
     index: usize,
@@ -14,7 +14,7 @@ struct Children<'a> {
 }
 
 impl<'a> Iterator for Children<'a> {
-    type Item = &'a SyntaxTree;
+    type Item = &'a TaggedSyntaxTree<'a>;
 
     fn next(&mut self) -> Option<Self::Item> {
         // If the forward index is greater than or equal to the backward index, there are no more
@@ -24,7 +24,7 @@ impl<'a> Iterator for Children<'a> {
         }
 
         // Figure out which child is next depending on the type of the tree.
-        let res = match self.tree {
+        let res = match &self.tree.data {
             // If the tree is a file, sequence, enum, or oneof, the children are in a vector.
             SyntaxTree::File(vec)
             | SyntaxTree::Sequence(_, vec)
@@ -64,7 +64,7 @@ impl<'a> DoubleEndedIterator for Children<'a> {
         self.index_back -= 1;
 
         // Figure out which child is next depending on the type of the tree.
-        let res = match self.tree {
+        let res = match &self.tree.data {
             // If the tree is a file, sequence, enum, or oneof, the children are in a vector.
             SyntaxTree::File(vec)
             | SyntaxTree::Sequence(_, vec)
@@ -93,12 +93,12 @@ trait ChildrenIterator<'a> {
     fn children(&'a self) -> Children<'a>;
 }
 
-impl<'a> ChildrenIterator<'a> for SyntaxTree {
+impl<'a> ChildrenIterator<'a> for TaggedSyntaxTree<'a> {
     fn children(&'a self) -> Children<'a> {
         Children {
             tree: self,
             index: 0,
-            index_back: match self {
+            index_back: match &self.data {
                 SyntaxTree::File(vec)
                 | SyntaxTree::Sequence(_, vec)
                 | SyntaxTree::Enum(_, vec)
@@ -125,7 +125,7 @@ pub trait TreeTraversal {
     fn iter_depth_first(&self) -> Self::DepthFirstIterator;
 }
 
-impl<'a> TreeTraversal for &'a SyntaxTree {
+impl<'a> TreeTraversal for &'a TaggedSyntaxTree<'a> {
     type BreadthFirstIterator = BreadthFirstSyntaxTreeInterator<'a>;
     type DepthFirstIterator = DepthFirstSyntaxTreeInterator<'a>;
 
@@ -141,12 +141,12 @@ impl<'a> TreeTraversal for &'a SyntaxTree {
 /// A breadth-first iterator over a SyntaxTree.
 pub struct BreadthFirstSyntaxTreeInterator<'a> {
     /// Queue of nodes to visit.
-    queue: VecDeque<&'a SyntaxTree>,
+    queue: VecDeque<&'a TaggedSyntaxTree<'a>>,
 }
 
 impl<'a> BreadthFirstSyntaxTreeInterator<'a> {
     /// Create a new breadth-first syntax tree iterator.
-    pub fn new(tree: &'a SyntaxTree) -> Self {
+    pub fn new(tree: &'a TaggedSyntaxTree) -> Self {
         let mut queue = VecDeque::new();
         queue.push_back(tree);
         Self { queue }
@@ -154,7 +154,7 @@ impl<'a> BreadthFirstSyntaxTreeInterator<'a> {
 }
 
 impl<'a> Iterator for BreadthFirstSyntaxTreeInterator<'a> {
-    type Item = &'a SyntaxTree;
+    type Item = &'a TaggedSyntaxTree<'a>;
 
     fn next(&mut self) -> Option<Self::Item> {
         if let Some(tree) = self.queue.pop_front() {
@@ -171,19 +171,19 @@ impl<'a> Iterator for BreadthFirstSyntaxTreeInterator<'a> {
 /// A depth-first iterator over a SyntaxTree.
 pub struct DepthFirstSyntaxTreeInterator<'a> {
     /// Stack of nodes to visit.
-    stack: Vec<&'a SyntaxTree>,
+    stack: Vec<&'a TaggedSyntaxTree<'a>>,
 }
 
 impl<'a> DepthFirstSyntaxTreeInterator<'a> {
     /// Create a new depth-first syntax tree iterator.
-    pub fn new(tree: &'a SyntaxTree) -> Self {
+    pub fn new(tree: &'a TaggedSyntaxTree) -> Self {
         let stack = vec![tree];
         Self { stack }
     }
 }
 
 impl<'a> Iterator for DepthFirstSyntaxTreeInterator<'a> {
-    type Item = &'a SyntaxTree;
+    type Item = &'a TaggedSyntaxTree<'a>;
 
     fn next(&mut self) -> Option<Self::Item> {
         if let Some(tree) = self.stack.pop() {

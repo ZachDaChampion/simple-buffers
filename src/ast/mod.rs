@@ -20,15 +20,55 @@ use crate::tokenizer::{Token, TokenIterator, TokenLocation, TokenType, Tokenizer
 use colored::Colorize;
 use std::error::Error;
 
-pub enum SyntaxTree {
-    File(Vec<SyntaxTree>),
-    Sequence(String, Vec<SyntaxTree>),
-    Field(String, Box<SyntaxTree>),
-    Enum(String, Vec<SyntaxTree>),
+pub struct TaggedSyntaxTree<'a> {
+    /// The data of this node.
+    pub data: SyntaxTree<'a>,
+
+    /// The main token associated with this node.
+    pub token: Option<Token<'a>>,
+}
+
+impl<'a> TaggedSyntaxTree<'a> {
+    /// Creates a new syntax tree.
+    ///
+    /// # Arguments
+    ///
+    /// * `data` - The data of this node.
+    /// * `token` - The main token associated with this node.
+    ///
+    /// # Returns
+    ///
+    /// A new syntax tree.
+    pub fn new(data: SyntaxTree<'a>, token: Token<'a>) -> Self {
+        Self {
+            data,
+            token: Some(token),
+        }
+    }
+}
+
+/// The data of a syntax tree node.
+pub enum SyntaxTree<'a> {
+    File(Vec<TaggedSyntaxTree<'a>>),
+    Sequence(String, Vec<TaggedSyntaxTree<'a>>),
+    Field(String, Box<TaggedSyntaxTree<'a>>),
+    Enum(String, Vec<TaggedSyntaxTree<'a>>),
     EnumEntry(String, i32),
     Type(String),
-    Array(Box<SyntaxTree>),
-    OneOf(Vec<SyntaxTree>),
+    Array(Box<TaggedSyntaxTree<'a>>),
+    OneOf(Vec<TaggedSyntaxTree<'a>>),
+}
+
+impl<'a> SyntaxTree<'a> {
+    pub fn tag(self, token: Token<'a>) -> TaggedSyntaxTree<'a> {
+        TaggedSyntaxTree::new(self, token)
+    }
+}
+
+impl<'a> From<SyntaxTree<'a>> for TaggedSyntaxTree<'a> {
+    fn from(data: SyntaxTree<'a>) -> Self {
+        Self { data, token: None }
+    }
 }
 
 /// An AST builder that lazily parses a string into a syntax tree.
@@ -44,7 +84,7 @@ pub struct AstBuilder<'a> {
 }
 
 /// A result type for parsing. This is a convenience type alias.
-pub type AstBuildResult<'a> = Result<SyntaxTree, Box<dyn Error + 'a>>;
+pub type AstBuildResult<'a> = Result<TaggedSyntaxTree<'a>, Box<dyn Error + 'a>>;
 
 impl<'a> AstBuilder<'a> {
     /// Creates an AstBuilder at the beginning of the source string. This will construct a Tokenizer
@@ -89,13 +129,13 @@ impl<'a> AstBuilder<'a> {
                 }
             }
         }
-        Ok(SyntaxTree::File(file))
+        Ok(SyntaxTree::File(file).into())
     }
 
     /// Parses the sequence rule.
     /// sequence -> "sequence" IDENTIFIER "{" (field ";")* "}"
     fn parse_sequence(&mut self) -> AstBuildResult<'a> {
-        self.expect(TokenType::Sequence)?;
+        let tag = self.expect(TokenType::Sequence)?;
         let name = self.expect_identifier()?;
         self.expect(TokenType::OpenBrace)?;
         let mut fields = Vec::new();
@@ -122,22 +162,22 @@ impl<'a> AstBuilder<'a> {
             }
         }
         self.expect(TokenType::CloseBrace)?;
-        Ok(SyntaxTree::Sequence(name, fields))
+        Ok(SyntaxTree::Sequence(name, fields).tag(tag))
     }
 
     /// Parses the field rule.
     /// field -> IDENTIFIER ":" type
     fn parse_field(&mut self) -> AstBuildResult<'a> {
-        let name = self.expect_identifier()?;
+        let (name, tag) = self.expect_identifier_with_token()?;
         self.expect(TokenType::Colon)?;
         let field_type = self.parse_type()?;
-        Ok(SyntaxTree::Field(name, Box::new(field_type)))
+        Ok(SyntaxTree::Field(name, Box::new(field_type)).tag(tag))
     }
 
     /// Parses the enum rule.
     /// enum -> "enum" IDENTIFIER "{" (enum_entry ";")* "}"
     fn parse_enum(&mut self) -> AstBuildResult<'a> {
-        self.expect(TokenType::Enum)?;
+        let tag = self.expect(TokenType::Enum)?;
         let name = self.expect_identifier()?;
         self.expect(TokenType::OpenBrace)?;
         let mut entries = Vec::new();
@@ -164,13 +204,13 @@ impl<'a> AstBuilder<'a> {
             }
         }
         self.expect(TokenType::CloseBrace)?;
-        Ok(SyntaxTree::Enum(name, entries))
+        Ok(SyntaxTree::Enum(name, entries).tag(tag))
     }
 
     /// Parses the enum_entry rule.
     /// enum_entry -> IDENTIFIER "=" NUMBER
     fn parse_enum_entry(&mut self) -> AstBuildResult<'a> {
-        let name = self.expect_identifier()?;
+        let (name, tag) = self.expect_identifier_with_token()?;
         self.expect(TokenType::Equals)?;
         let value = self.expect_number()?;
         let value_num =
@@ -191,7 +231,7 @@ impl<'a> AstBuilder<'a> {
                     },
                     Some("expected a number literal".to_string()),
                 ))))?;
-        Ok(SyntaxTree::EnumEntry(name, value_num))
+        Ok(SyntaxTree::EnumEntry(name, value_num).tag(tag))
     }
 
     /// Parses the type rule.
@@ -200,8 +240,9 @@ impl<'a> AstBuilder<'a> {
         match &self.current_token {
             Some(token) => match token.token_type {
                 TokenType::Identifier(_) => {
+                    let tag = token.clone();
                     let name = self.expect_identifier()?;
-                    Ok(SyntaxTree::Type(name))
+                    Ok(SyntaxTree::Type(name).tag(tag))
                 }
                 TokenType::OpenBracket => self.parse_array(),
                 TokenType::Oneof => self.parse_oneof(),
@@ -219,16 +260,16 @@ impl<'a> AstBuilder<'a> {
     /// Parses the array rule.
     /// array -> "[" type "]"
     fn parse_array(&mut self) -> AstBuildResult<'a> {
-        self.expect(TokenType::OpenBracket)?;
+        let tag = self.expect(TokenType::OpenBracket)?;
         let array_type = self.parse_type()?;
         self.expect(TokenType::CloseBracket)?;
-        Ok(SyntaxTree::Array(Box::new(array_type)))
+        Ok(SyntaxTree::Array(Box::new(array_type)).tag(tag))
     }
 
     /// Parses the oneof rule.
     /// oneof -> "oneof" "{" (field ";")* "}"
     fn parse_oneof(&mut self) -> AstBuildResult<'a> {
-        self.expect(TokenType::Oneof)?;
+        let tag = self.expect(TokenType::Oneof)?;
         self.expect(TokenType::OpenBrace)?;
         let mut fields = Vec::new();
         loop {
@@ -254,7 +295,7 @@ impl<'a> AstBuilder<'a> {
             }
         }
         self.expect(TokenType::CloseBrace)?;
-        Ok(SyntaxTree::OneOf(fields))
+        Ok(SyntaxTree::OneOf(fields).tag(tag))
     }
 
     /// Advances the parser to the next token.
@@ -273,7 +314,7 @@ impl<'a> AstBuilder<'a> {
     /// # Returns
     ///
     /// The current token if it is of the provided type.
-    fn expect(&mut self, token_type: TokenType) -> Result<Token, Box<dyn Error + 'a>> {
+    fn expect(&mut self, token_type: TokenType) -> Result<Token<'a>, Box<dyn Error + 'a>> {
         match &self.current_token {
             Some(token) => {
                 if token.token_type != token_type {
@@ -303,6 +344,33 @@ impl<'a> AstBuilder<'a> {
             Some(token) => {
                 if let TokenType::Identifier(identifier) = &token.token_type {
                     let res = identifier.clone();
+                    self.advance()?;
+                    Ok(res)
+                } else {
+                    Err(Box::new(AstBuilderError::unexpected_token(
+                        token,
+                        Some("expected an identifier".to_string()),
+                    )))
+                }
+            }
+            None => Err(Box::new(AstBuilderError::UnexpectedEof {
+                file: self.file.to_string(),
+            })),
+        }
+    }
+
+    /// Expects the current token to be an identifier and returns the token in addition to the
+    /// identifier. If the current token is not an identifier, an error is returned. If the current
+    /// token is an identifier, it is consumed and the next token is loaded.
+    ///
+    /// # Returns
+    ///
+    /// A tuple containing the identifier and the token.
+    fn expect_identifier_with_token(&mut self) -> Result<(String, Token<'a>), Box<dyn Error + 'a>> {
+        match &self.current_token {
+            Some(token) => {
+                if let TokenType::Identifier(identifier) = &token.token_type {
+                    let res = (identifier.clone(), token.clone());
                     self.advance()?;
                     Ok(res)
                 } else {
