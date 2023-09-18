@@ -11,15 +11,14 @@
 //! - array      ->  "[" type "]"
 //! - oneof      ->  "oneof" "{" (field ";")* "}"
 
-use std::error::Error;
-
-use colored::Colorize;
+mod error;
+mod traverse;
+pub use self::error::AstBuilderError;
+pub use traverse::*;
 
 use crate::tokenizer::{Token, TokenIterator, TokenLocation, TokenType, Tokenizer};
-
-use self::error::AstBuilderError;
-
-mod error;
+use colored::Colorize;
+use std::error::Error;
 
 pub enum SyntaxTree {
     File(Vec<SyntaxTree>),
@@ -29,7 +28,7 @@ pub enum SyntaxTree {
     EnumEntry(String, i32),
     Type(String),
     Array(Box<SyntaxTree>),
-    Oneof(Vec<SyntaxTree>),
+    OneOf(Vec<SyntaxTree>),
 }
 
 /// An AST builder that lazily parses a string into a syntax tree.
@@ -45,7 +44,7 @@ pub struct AstBuilder<'a> {
 }
 
 /// A result type for parsing. This is a convenience type alias.
-pub type AstBuildResult = Result<SyntaxTree, Box<dyn Error>>;
+pub type AstBuildResult<'a> = Result<SyntaxTree, Box<dyn Error + 'a>>;
 
 impl<'a> AstBuilder<'a> {
     /// Creates an AstBuilder at the beginning of the source string. This will construct a Tokenizer
@@ -59,7 +58,7 @@ impl<'a> AstBuilder<'a> {
     /// # Returns
     ///
     /// An AstBuilder at the beginning of the source string.
-    pub fn new(source: &'a str, file: &'a str) -> Result<Self, Box<dyn Error>> {
+    pub fn new(source: &'a str, file: &'a str) -> Result<Self, Box<dyn Error + 'a>> {
         let mut tokens = Box::new(Tokenizer::new(source, file)?);
         let current_token = tokens.next().transpose()?;
         Ok(Self {
@@ -70,13 +69,13 @@ impl<'a> AstBuilder<'a> {
     }
 
     /// Parses the source string into a syntax tree.
-    pub fn parse(&mut self) -> AstBuildResult {
+    pub fn parse(&mut self) -> AstBuildResult<'a> {
         self.parse_file()
     }
 
     /// Parses the file rule.
     /// file -> (sequence | enum)* EOF
-    fn parse_file(&mut self) -> AstBuildResult {
+    fn parse_file(&mut self) -> AstBuildResult<'a> {
         let mut file = Vec::new();
         while let Some(token) = &self.current_token {
             match token.token_type {
@@ -95,7 +94,7 @@ impl<'a> AstBuilder<'a> {
 
     /// Parses the sequence rule.
     /// sequence -> "sequence" IDENTIFIER "{" (field ";")* "}"
-    fn parse_sequence(&mut self) -> AstBuildResult {
+    fn parse_sequence(&mut self) -> AstBuildResult<'a> {
         self.expect(TokenType::Sequence)?;
         let name = self.expect_identifier()?;
         self.expect(TokenType::OpenBrace)?;
@@ -128,7 +127,7 @@ impl<'a> AstBuilder<'a> {
 
     /// Parses the field rule.
     /// field -> IDENTIFIER ":" type
-    fn parse_field(&mut self) -> AstBuildResult {
+    fn parse_field(&mut self) -> AstBuildResult<'a> {
         let name = self.expect_identifier()?;
         self.expect(TokenType::Colon)?;
         let field_type = self.parse_type()?;
@@ -137,7 +136,7 @@ impl<'a> AstBuilder<'a> {
 
     /// Parses the enum rule.
     /// enum -> "enum" IDENTIFIER "{" (enum_entry ";")* "}"
-    fn parse_enum(&mut self) -> AstBuildResult {
+    fn parse_enum(&mut self) -> AstBuildResult<'a> {
         self.expect(TokenType::Enum)?;
         let name = self.expect_identifier()?;
         self.expect(TokenType::OpenBrace)?;
@@ -170,7 +169,7 @@ impl<'a> AstBuilder<'a> {
 
     /// Parses the enum_entry rule.
     /// enum_entry -> IDENTIFIER "=" NUMBER
-    fn parse_enum_entry(&mut self) -> AstBuildResult {
+    fn parse_enum_entry(&mut self) -> AstBuildResult<'a> {
         let name = self.expect_identifier()?;
         self.expect(TokenType::Equals)?;
         let value = self.expect_number()?;
@@ -197,7 +196,7 @@ impl<'a> AstBuilder<'a> {
 
     /// Parses the type rule.
     /// type -> IDENTIFIER | array | oneof
-    fn parse_type(&mut self) -> AstBuildResult {
+    fn parse_type(&mut self) -> AstBuildResult<'a> {
         match &self.current_token {
             Some(token) => match token.token_type {
                 TokenType::Identifier(_) => {
@@ -219,7 +218,7 @@ impl<'a> AstBuilder<'a> {
 
     /// Parses the array rule.
     /// array -> "[" type "]"
-    fn parse_array(&mut self) -> AstBuildResult {
+    fn parse_array(&mut self) -> AstBuildResult<'a> {
         self.expect(TokenType::OpenBracket)?;
         let array_type = self.parse_type()?;
         self.expect(TokenType::CloseBracket)?;
@@ -228,7 +227,7 @@ impl<'a> AstBuilder<'a> {
 
     /// Parses the oneof rule.
     /// oneof -> "oneof" "{" (field ";")* "}"
-    fn parse_oneof(&mut self) -> AstBuildResult {
+    fn parse_oneof(&mut self) -> AstBuildResult<'a> {
         self.expect(TokenType::Oneof)?;
         self.expect(TokenType::OpenBrace)?;
         let mut fields = Vec::new();
@@ -255,11 +254,11 @@ impl<'a> AstBuilder<'a> {
             }
         }
         self.expect(TokenType::CloseBrace)?;
-        Ok(SyntaxTree::Oneof(fields))
+        Ok(SyntaxTree::OneOf(fields))
     }
 
     /// Advances the parser to the next token.
-    fn advance(&mut self) -> Result<(), Box<dyn Error>> {
+    fn advance(&mut self) -> Result<(), Box<dyn Error + 'a>> {
         self.current_token = self.tokens.next().transpose()?;
         Ok(())
     }
@@ -274,7 +273,7 @@ impl<'a> AstBuilder<'a> {
     /// # Returns
     ///
     /// The current token if it is of the provided type.
-    fn expect(&mut self, token_type: TokenType) -> Result<Token, Box<dyn Error>> {
+    fn expect(&mut self, token_type: TokenType) -> Result<Token, Box<dyn Error + 'a>> {
         match &self.current_token {
             Some(token) => {
                 if token.token_type != token_type {
@@ -299,7 +298,7 @@ impl<'a> AstBuilder<'a> {
     /// # Returns
     ///
     /// The identifier if the current token is an identifier.
-    fn expect_identifier(&mut self) -> Result<String, Box<dyn Error>> {
+    fn expect_identifier(&mut self) -> Result<String, Box<dyn Error + 'a>> {
         match &self.current_token {
             Some(token) => {
                 if let TokenType::Identifier(identifier) = &token.token_type {
@@ -326,7 +325,7 @@ impl<'a> AstBuilder<'a> {
     /// # Returns
     ///
     /// The number literal if the current token is a number literal.
-    fn expect_number(&mut self) -> Result<String, Box<dyn Error>> {
+    fn expect_number(&mut self) -> Result<String, Box<dyn Error + 'a>> {
         match &self.current_token {
             Some(token) => {
                 if let TokenType::Number(number) = &token.token_type {

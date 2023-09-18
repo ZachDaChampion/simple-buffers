@@ -1,12 +1,11 @@
-pub mod error;
+mod error;
+pub use self::error::TokenizerError;
 
 use colored::Colorize;
 use lazy_static::lazy_static;
 use regex::Regex;
 use regex_macro::regex;
 use std::fmt;
-
-use error::TokenizerError;
 
 type OptionalTokenGenerator = Option<fn(String) -> TokenType>;
 lazy_static! {
@@ -242,7 +241,7 @@ impl<'a> Tokenizer<'a> {
     ///
     /// * `source` - The source string to tokenize.
     /// * `file` - The name of the file being tokenized.
-    pub fn new(source: &'a str, file: &'a str) -> Result<Self, TokenizerError> {
+    pub fn new(source: &'a str, file: &'a str) -> Result<Self, String> {
         let mut lines_iter = source.lines();
         let first_line = lines_iter.next();
         let second_line = lines_iter.next();
@@ -259,7 +258,7 @@ impl<'a> Tokenizer<'a> {
             line_text: first_line,
             next_line_text: second_line,
         };
-        tokenizer.advance(true)?;
+        tokenizer.advance(true).map_err(|err| err.to_string())?;
 
         Ok(tokenizer)
     }
@@ -269,7 +268,7 @@ impl<'a> Tokenizer<'a> {
     /// # Returns
     ///
     /// * `Some(token)` if there is a next token, `None` otherwise.
-    pub fn pop(&mut self) -> Result<Option<Token<'a>>, TokenizerError> {
+    pub fn pop(&mut self) -> Result<Option<Token<'a>>, TokenizerError<'a>> {
         let token = self.next_token.clone();
         self.advance(false)?;
         Ok(token)
@@ -281,7 +280,7 @@ impl<'a> Tokenizer<'a> {
     ///
     /// * `first` - Whether or not this is the first call to `advance`. If this is true, the current
     ///             token will be ignored.
-    fn advance(&mut self, first: bool) -> Result<(), TokenizerError> {
+    fn advance(&mut self, first: bool) -> Result<(), TokenizerError<'a>> {
         // Check if the tokenizer has reached the end of the source string
         if self.next_token.is_none() && !first {
             return Ok(());
@@ -356,9 +355,9 @@ impl<'a> Tokenizer<'a> {
     }
 }
 
-pub type TokenIterator<'a> = dyn Iterator<Item = Result<Token<'a>, TokenizerError>> + 'a;
+pub type TokenIterator<'a> = dyn Iterator<Item = Result<Token<'a>, TokenizerError<'a>>> + 'a;
 impl<'a> Iterator for Tokenizer<'a> {
-    type Item = Result<Token<'a>, TokenizerError>;
+    type Item = Result<Token<'a>, TokenizerError<'a>>;
 
     fn next(&mut self) -> Option<Self::Item> {
         self.pop().transpose()

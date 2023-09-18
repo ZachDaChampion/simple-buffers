@@ -2,6 +2,7 @@ use ast::SyntaxTree;
 use std::{collections::LinkedList, error::Error};
 
 mod ast;
+mod compiler;
 mod tokenizer;
 
 fn main() {
@@ -22,7 +23,7 @@ fn print_ast(source: String) -> Result<(), Box<dyn Error>> {
     let mut parser =
         ast::AstBuilder::new(source.as_str(), "test.sb").expect("Failed to create parser");
 
-    let ast = parser.parse()?;
+    let ast = parser.parse().map_err(|e| e.to_string())?;
     let mut stack = LinkedList::new();
     stack.push_back(Visitor::Visit(&ast));
     let mut indent = 0;
@@ -76,7 +77,7 @@ fn print_ast(source: String) -> Result<(), Box<dyn Error>> {
                         stack.push_back(Visitor::Visit(inner));
                         indent += 1;
                     }
-                    SyntaxTree::Oneof(fields) => {
+                    SyntaxTree::OneOf(fields) => {
                         println!("OneOf");
                         stack.push_back(Visitor::Cleanup(node));
                         for field in fields.iter().rev() {
@@ -92,7 +93,7 @@ fn print_ast(source: String) -> Result<(), Box<dyn Error>> {
                 | SyntaxTree::Field(_, _)
                 | SyntaxTree::Enum(_, _)
                 | SyntaxTree::Array(_)
-                | SyntaxTree::Oneof(_) => {
+                | SyntaxTree::OneOf(_) => {
                     indent -= 1;
                 }
                 _ => {}
