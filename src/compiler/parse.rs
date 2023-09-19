@@ -7,6 +7,7 @@ use crate::ast::{SyntaxTree, TaggedSyntaxTree, TreeTraversal};
 use core::fmt;
 use std::collections::HashMap;
 
+/// Array of primitive names and internal representations.
 const PRIMITIVES: [(&str, Primitive); 13] = [
     ("bool", Primitive::Bool),
     ("i8", Primitive::I8),
@@ -39,6 +40,27 @@ pub enum Primitive {
     F64,
     String,
     Bytes,
+}
+
+impl Primitive {
+    /// Get the size of the primitive in bytes.
+    pub fn size(&self) -> usize {
+        match self {
+            Primitive::Bool => 1,
+            Primitive::I8 => 1,
+            Primitive::I16 => 2,
+            Primitive::I32 => 4,
+            Primitive::I64 => 8,
+            Primitive::U8 => 1,
+            Primitive::U16 => 2,
+            Primitive::U32 => 4,
+            Primitive::U64 => 8,
+            Primitive::F32 => 4,
+            Primitive::F64 => 8,
+            Primitive::String => 2, // 16-bit offset to actual string
+            Primitive::Bytes => 2,  // 16-bit offset to actual bytes
+        }
+    }
 }
 
 impl fmt::Display for Primitive {
@@ -78,6 +100,10 @@ pub struct Field {
 
     /// The type of the field.
     pub ty: Type,
+
+    /// The byte offset of the field. This is calculated from the start of the containing sequence
+    /// or oneof.
+    pub offset: usize,
 }
 
 /// A type.
@@ -97,6 +123,21 @@ pub enum Type {
 
     /// A oneof type. This is a type that can be one of several types.
     OneOf(Vec<Field>),
+}
+
+impl Type {
+    /// Get the size of the type in bytes. This is the fixed size that the type will take up in a
+    /// sequence or oneof. It does not account for any dynamic sizes such as the size of a string
+    /// that are added to the end of the structure.
+    pub fn size(&self) -> usize {
+        match self {
+            Self::Primitive(p) => p.size(),
+            Self::Sequence(_) => 2, // 16-bit offset to actual sequence
+            Self::Enum(_) => 1,     // 8-bit enum value
+            Self::Array(_) => 4,    // 16-bit array length + 16-bit offset to actual array
+            Self::OneOf(_) => 3,    // 8-bit index + 16-bit offset to actual field
+        }
+    }
 }
 
 /// An enum.
@@ -222,6 +263,7 @@ fn parse_sequence<'a>(
     let mut field_names = Vec::<String>::with_capacity(fields.len());
 
     // Parse all the fields and ensure that all field names are unique.
+    let mut offset = 0;
     for field in fields {
         if let SyntaxTree::Field(field_name, field_type) = &field.data {
             // Check if the field name is unique.
@@ -239,10 +281,13 @@ fn parse_sequence<'a>(
 
             // Parse the field type.
             let field_type = parse_type(field_type, struct_map)?;
+            let field_size = field_type.size();
             res.push(Field {
                 name: field_name.clone(),
                 ty: field_type,
+                offset,
             });
+            offset += field_size;
         } else {
             unreachable!("Field is not a field")
         }
@@ -292,6 +337,7 @@ fn parse_type<'a>(
             let mut field_names = Vec::<String>::with_capacity(fields.len());
 
             // Parse all fields and ensure that all field names are unique.
+            let mut offset = 0;
             for field in fields {
                 if let SyntaxTree::Field(field_name, field_type) = &field.data {
                     // Check if the field name is unique.
@@ -308,10 +354,13 @@ fn parse_type<'a>(
 
                     // Parse the field type.
                     let field_type = parse_type(field_type, struct_map)?;
+                    let field_size = field_type.size();
                     res.push(Field {
                         name: field_name.clone(),
                         ty: field_type,
+                        offset,
                     });
+                    offset += field_size;
                 } else {
                     unreachable!("Field is not a field")
                 }

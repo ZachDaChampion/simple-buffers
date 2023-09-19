@@ -1,59 +1,30 @@
-enum Error {
-    Ok = 0;
-    InvalidRequest = 1;
-}
-
-// this is a comment
-sequence MoveToEntry {
-    id: u8; // this is another comment
-    dest: f32;
-    speed: f32;
-}
-
-sequence MoveTo {
-    entries: [MoveToEntry];
-}
-
-sequence Init {
-    expected_fw_version: u32;
+enum RobotJoint {
+    j0 = 0;
+    j1 = 1;
+    j2 = 2;
+    j3 = 3;
+    j4 = 4;
+    j5 = 5;
 }
 
 sequence Request {
-    request_id: u32;
+    id: u32;
     payload: oneof {
         init: Init;
-        move_to: MoveTo;
+        moveTo: MoveTo;
     };
-
-    error: Error;
-
-
-    test: [oneof {
-        init: Init;
-        error: Error;
-        another: oneof {
-            init: Init;
-            move_to: MoveTo;
-        };
-    }];
 }
 
-sequence MainSequence {
-    id: u32;
-    fun_array: [string];
-    another_sequence: OtherSequence;
+sequence Init {
+    expected_firmware: u32;
 }
 
-sequence OtherSequence {
-    name: string;
+sequence MoveTo {
+    joints: [MoveToEntry];
 }
 
-sequence Seq {
-    array0: [oneof {
-        array1: [u32];
-        another_oneof: oneof {
-            name: string;
-            lol_recursion: Seq;
-        };
-    }];
+sequence MoveToEntry {
+    joint: RobotJoint;
+    angle: f32;
+    speed: f32;
 }

@@ -152,10 +152,15 @@ fn print_parsed(parsed: ParseResult) -> Result<(), Box<dyn Error>> {
         for field in sequence.fields.iter() {
             let mut indent = 1;
             let mut stack = LinkedList::new();
-            stack.push_back((Some(field.name.clone()), &field.ty));
-            while let Some((field_name, field_type)) = stack.pop_back() {
+            stack.push_back((Some(field.name.clone()), &field.ty, field.offset));
+            while let Some((field_name, field_type, field_offset)) = stack.pop_back() {
                 if let Some(n) = field_name {
-                    print!("{indent}{name}: ", indent = "  ".repeat(indent), name = n);
+                    print!(
+                        "{indent}{offset} | {name}: ",
+                        offset = field_offset,
+                        indent = "  ".repeat(indent),
+                        name = n
+                    );
                 }
                 match &field_type {
                     compiler::Type::Primitive(name) => println!("{} (primitive)", name),
@@ -163,12 +168,12 @@ fn print_parsed(parsed: ParseResult) -> Result<(), Box<dyn Error>> {
                     compiler::Type::Enum(name) => println!("{} (enum)", name),
                     compiler::Type::Array(ty) => {
                         print!("ARRAY OF ");
-                        stack.push_back((None, ty));
+                        stack.push_back((None, ty, 0));
                     }
                     compiler::Type::OneOf(f) => {
                         println!("ONE OF:");
                         for field in f.iter().rev() {
-                            stack.push_back((Some(field.name.clone()), &field.ty));
+                            stack.push_back((Some(field.name.clone()), &field.ty, field.offset));
                         }
                         indent += 1;
                     }
