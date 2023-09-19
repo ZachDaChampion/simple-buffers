@@ -164,7 +164,6 @@ fn print_parsed(parsed: ParseResult) -> Result<(), Box<dyn Error>> {
                     compiler::Type::Array(ty) => {
                         print!("ARRAY OF ");
                         stack.push_back((None, ty));
-                        indent += 1;
                     }
                     compiler::Type::OneOf(f) => {
                         println!("ONE OF:");
