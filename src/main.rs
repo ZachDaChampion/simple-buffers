@@ -1,5 +1,8 @@
 use ast::{SyntaxTree, TaggedSyntaxTree};
+use compiler::ParseResult;
 use std::{collections::LinkedList, error::Error};
+
+use crate::compiler::{Enum, EnumVariant};
 
 mod ast;
 mod compiler;
@@ -9,24 +12,44 @@ fn main() {
     // Load test.sb into a string.
     let source = std::fs::read_to_string("test.sb").expect("Failed to read test.sb");
 
-    if let Err(e) = print_ast(source) {
-        println!("\n{}\n", e);
+    // Run the compiler.
+    println!();
+    if let Err(e) = do_stuff(source) {
+        eprintln!("{}", e);
     }
 }
 
-enum Visitor<'a> {
-    Visit(&'a TaggedSyntaxTree<'a>),
-    Cleanup(&'a TaggedSyntaxTree<'a>),
+enum Visitor<'a, T>
+where
+    T: 'a,
+{
+    Visit(&'a T),
+    Cleanup(&'a T),
 }
 
-fn print_ast(source: String) -> Result<(), Box<dyn Error>> {
+fn do_stuff(source: String) -> Result<(), String> {
     let mut parser =
         ast::AstBuilder::new(source.as_str(), "test.sb").expect("Failed to create parser");
-
     let ast = parser.parse().map_err(|e| e.to_string())?;
+
+    print_ast(&ast).map_err(|e| e.to_string())?;
+
+    let parsed = compiler::parse_ast(&ast).map_err(|e| e.to_string())?;
+    print_parsed(parsed).map_err(|e| e.to_string())?;
+
+    Ok(())
+}
+
+fn print_ast(ast: &TaggedSyntaxTree<'_>) -> Result<(), Box<dyn Error>> {
     let mut stack = LinkedList::new();
-    stack.push_back(Visitor::Visit(&ast));
+    stack.push_back(Visitor::Visit(ast));
     let mut indent = 0;
+
+    print!(concat!(
+        "=========================\n",
+        "|      SYNTAX TREE      |\n",
+        "=========================\n\n"
+    ));
 
     while let Some(action) = stack.pop_back() {
         match action {
@@ -99,6 +122,61 @@ fn print_ast(source: String) -> Result<(), Box<dyn Error>> {
                 _ => {}
             },
         }
+    }
+
+    println!();
+    Ok(())
+}
+
+fn print_parsed(parsed: ParseResult) -> Result<(), Box<dyn Error>> {
+    print!(concat!(
+        "=========================\n",
+        "|         ENUMS         |\n",
+        "=========================\n\n"
+    ));
+    for Enum { name, variants } in parsed.enums.iter() {
+        println!("{}:", name);
+        for EnumVariant { name, value } in variants.iter() {
+            println!("  {} = {}", name, value);
+        }
+        println!();
+    }
+
+    print!(concat!(
+        "=========================\n",
+        "|       SEQUENCES       |\n",
+        "=========================\n\n"
+    ));
+    for sequence in parsed.sequences.iter() {
+        println!("{}:", sequence.name);
+        for field in sequence.fields.iter() {
+            let mut indent = 1;
+            let mut stack = LinkedList::new();
+            stack.push_back((Some(field.name.clone()), &field.ty));
+            while let Some((field_name, field_type)) = stack.pop_back() {
+                if let Some(n) = field_name {
+                    print!("{indent}{name}: ", indent = "  ".repeat(indent), name = n);
+                }
+                match &field_type {
+                    compiler::Type::Primitive(name) => println!("{} (primitive)", name),
+                    compiler::Type::Sequence(name) => println!("{} (sequence)", name),
+                    compiler::Type::Enum(name) => println!("{} (enum)", name),
+                    compiler::Type::Array(ty) => {
+                        print!("ARRAY OF ");
+                        stack.push_back((None, ty));
+                        indent += 1;
+                    }
+                    compiler::Type::OneOf(f) => {
+                        println!("ONE OF:");
+                        for field in f.iter().rev() {
+                            stack.push_back((Some(field.name.clone()), &field.ty));
+                        }
+                        indent += 1;
+                    }
+                }
+            }
+        }
+        println!();
     }
 
     Ok(())

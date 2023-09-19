@@ -333,7 +333,7 @@ impl<'a> Tokenizer<'a> {
 
                     // If there is no token function, advance to the next token
                     if token_fn.is_none() {
-                        self.advance(false)?;
+                        self.advance(true)?;
                     }
 
                     return Ok(());

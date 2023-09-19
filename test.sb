@@ -1,27 +1,59 @@
-enum Error {
-    Ok = 0;
-    InvalidRequest = 1;
-}
+// enum Error {
+//     Ok = 0;
+//     InvalidRequest = 1;
+// }
+// 
+// // this is a comment
+// sequence MoveToEntry {
+//     id: u8; // this is another comment
+//     dest: f32;
+//     speed: f32;
+// }
+// 
+// sequence MoveTo {
+//     entries: [MoveToEntry];
+// }
+// 
+// sequence Init {
+//     expected_fw_version: u32;
+// }
+// 
+// sequence Request {
+//     request_id: u32;
+//     payload: oneof {
+//         init: Init;
+//         move_to: MoveTo;
+//     };
+// 
+//     error: Error;
+// 
+// 
+//     test: [oneof {
+//         init: Init;
+//         error: Error;
+//         another: oneof {
+//             init: Init;
+//             move_to: MoveTo;
+//         };
+//     }];
+// }
+// 
+// sequence MainSequence {
+//     id: u32;
+//     fun_array: [string];
+//     another_sequence: OtherSequence;
+// }
+// 
+// sequence OtherSequence {
+//     name: string;
+// }
 
-// this is a comment
-sequence MoveToEntry {
-    id: u8; // this is another comment
-    dest: f32;
-    speed: f32;
-}
-
-sequence MoveTo {
-    entries: [MoveToEntry];
-}
-
-sequence Init {
-    expected_fw_version: u32;
-}
-
-sequence Request {
-    request_id: u32;
-    payload: oneof {
-        init: Init;
-        move_to: MoveTo;
-    };
+sequence Seq {
+    array0: [oneof {
+        array1: [u32];
+        another_oneof: oneof {
+            name: string;
+            lol_recursion: Seq;
+        };
+    }];
 }

@@ -16,7 +16,7 @@ mod traverse;
 pub use self::error::AstBuilderError;
 pub use traverse::*;
 
-use crate::tokenizer::{Token, TokenIterator, TokenLocation, TokenType, Tokenizer};
+use crate::tokenizer::{Token, TokenIterator, TokenType, Tokenizer};
 use colored::Colorize;
 use std::error::Error;
 
@@ -53,7 +53,7 @@ pub enum SyntaxTree<'a> {
     Sequence(String, Vec<TaggedSyntaxTree<'a>>),
     Field(String, Box<TaggedSyntaxTree<'a>>),
     Enum(String, Vec<TaggedSyntaxTree<'a>>),
-    EnumEntry(String, i32),
+    EnumEntry(String, String),
     Type(String),
     Array(Box<TaggedSyntaxTree<'a>>),
     OneOf(Vec<TaggedSyntaxTree<'a>>),
@@ -213,25 +213,7 @@ impl<'a> AstBuilder<'a> {
         let (name, tag) = self.expect_identifier_with_token()?;
         self.expect(TokenType::Equals)?;
         let value = self.expect_number()?;
-        let value_num =
-            value
-                .parse::<i32>()
-                .or(Err(Box::new(AstBuilderError::unexpected_token(
-                    &Token {
-                        token_type: TokenType::Number(value),
-                        location: TokenLocation {
-                            file: self.file,
-                            line_num: 0,
-                            col_num: 0,
-                            width: 0,
-                            prev_line_text: None,
-                            line_text: None,
-                            next_line_text: None,
-                        },
-                    },
-                    Some("expected a number literal".to_string()),
-                ))))?;
-        Ok(SyntaxTree::EnumEntry(name, value_num).tag(tag))
+        Ok(SyntaxTree::EnumEntry(name, value).tag(tag))
     }
 
     /// Parses the type rule.
