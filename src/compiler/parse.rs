@@ -101,9 +101,9 @@ pub struct Field {
     /// The type of the field.
     pub ty: Type,
 
-    /// The byte offset of the field. This is calculated from the start of the containing sequence
-    /// or oneof.
-    pub offset: usize,
+    /// The index of the field. For sequences, this is the offset in bytes from the start of the
+    /// sequence. For oneofs, this is the index of the field in the oneof.
+    pub index: usize,
 }
 
 /// A type.
@@ -285,7 +285,7 @@ fn parse_sequence<'a>(
             res.push(Field {
                 name: field_name.clone(),
                 ty: field_type,
-                offset,
+                index: offset,
             });
             offset += field_size;
         } else {
@@ -337,8 +337,7 @@ fn parse_type<'a>(
             let mut field_names = Vec::<String>::with_capacity(fields.len());
 
             // Parse all fields and ensure that all field names are unique.
-            let mut offset = 0;
-            for field in fields {
+            for (i, field) in fields.iter().enumerate() {
                 if let SyntaxTree::Field(field_name, field_type) = &field.data {
                     // Check if the field name is unique.
                     if field_names.contains(field_name) {
@@ -354,13 +353,11 @@ fn parse_type<'a>(
 
                     // Parse the field type.
                     let field_type = parse_type(field_type, struct_map)?;
-                    let field_size = field_type.size();
                     res.push(Field {
                         name: field_name.clone(),
                         ty: field_type,
-                        offset,
+                        index: i,
                     });
-                    offset += field_size;
                 } else {
                     unreachable!("Field is not a field")
                 }
