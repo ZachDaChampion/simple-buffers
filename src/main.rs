@@ -6,6 +6,8 @@ use crate::compiler::{Enum, EnumVariant};
 
 mod ast;
 mod compiler;
+mod generators;
+mod indent;
 mod tokenizer;
 
 fn main() {
