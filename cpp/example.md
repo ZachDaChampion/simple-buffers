@@ -107,7 +107,7 @@ int32_t bytes_written = XWriter(
     ArrayWriter({
         BWriter(1, "b1"),
         BWriter(2, "b2")
-    }, 2),
+    }, 2)
 ).write(buffer, 100);
 ```
 
