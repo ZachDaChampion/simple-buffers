@@ -231,7 +231,7 @@ uint16_t get_static_size(const float val) { return 4; }
 uint16_t get_static_size(const double val) { return 8; }
 uint16_t get_static_size(const bool val) { return 1; }
 uint16_t get_static_size(const SimpleBufferWriter& val) { return val.static_size(); }
-uint16_t get_static_size(const char* const& val) { return 2; }
+uint16_t get_static_size(char* const& val) { return 2; }
 
 //                                                                                                //
 // ======================================== Write field ========================================= //
@@ -349,7 +349,7 @@ uint8_t* write_field(uint8_t* dest, const uint8_t* dest_end, uint8_t* dyn_cursor
 }
 
 uint8_t* write_field(uint8_t* dest, const uint8_t* dest_end, uint8_t* dyn_cursor,
-                     const char* const& val) {
+                     char* const& val) {
     uint16_t str_len = strlen(val);
     if (dyn_cursor + str_len + 1 > dest_end) return nullptr;  // +1 for null terminator
 
