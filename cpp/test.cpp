@@ -25,6 +25,8 @@ Sequence Y {
 class XWriter;
 class YWriter;
 
+class ZWriter;
+
 class XWriter : public SimpleBufferWriter {
    public:
     XWriter(uint8_t a, char* b, ArrayWriter<YWriter> c) : a(a), b(b), c(c) {}
@@ -71,13 +73,48 @@ class YWriter : public SimpleBufferWriter {
     }
 };
 
-uint8_t buffer[100];
+class ZWriter : public SimpleBufferWriter {
+   public:
+    enum class Tag : uint8_t {
+        X = 0,
+        Y = 1,
+    };
+
+    union Type {
+        XWriter x;
+        YWriter y;
+    };
+
+    ZWriter(Tag tag, const Type* val) : tag(tag), val(val) {}
+
+    Tag tag;
+    const Type* val;
+
+    uint16_t static_size() const override { return 3; }
+
+    uint8_t* write_component(uint8_t* dest, const uint8_t* dest_end,
+                             uint8_t* dyn_cursor) const override {
+        if (dest_end - dest < 2) return nullptr;
+        switch (tag) {
+            case Tag::X:
+                dyn_cursor = write_oneof_field(dest, dest_end, dyn_cursor, (uint8_t)tag, val->x);
+                break;
+            case Tag::Y:
+                dyn_cursor = write_oneof_field(dest, dest_end, dyn_cursor, (uint8_t)tag, val->y);
+                break;
+        }
+        return dyn_cursor;
+    }
+};
+
+uint8_t buffer[512];
 
 int main() {
     YWriter c_writers[] = {YWriter(1, "c1"), YWriter(2, "c2")};
     XWriter x_writer(5, "b str", ArrayWriter<YWriter>(c_writers, 2));
+    ZWriter z_writer(ZWriter::Tag::X, (const ZWriter::Type*)&x_writer);
 
-    int32_t bytes_written = x_writer.write(buffer, 100);
+    int32_t bytes_written = z_writer.write(buffer, 512);
 
     cout << "bytes written: " << bytes_written << endl;
     for (int i = 0; i < bytes_written; i++) {

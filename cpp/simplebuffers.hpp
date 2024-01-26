@@ -370,6 +370,32 @@ uint8_t* write_field(uint8_t* dest, const uint8_t* dest_end, uint8_t* dyn_cursor
     return val.write_component(dest, dest_end, dyn_cursor);
 }
 
+/**
+ * @brief Writes a OneOf field to the destination buffer.
+ *
+ * @param[out] dest The destination to write static data to.
+ * @param[in] dest_end The end of the destination buffer.
+ * @param[out] dyn_cursor The dynamic cursor for writing variable-length fields.
+ * @param[in] tag The tag of the OneOf field.
+ * @param[in] val The value to write.
+ * @return A pointer to the end of the dynamic data written to the buffer, or `nullptr` if the
+ *         buffer was too small.
+ */
+template <typename T>
+uint8_t* write_oneof_field(uint8_t* dest, const uint8_t* dest_end, uint8_t* dyn_cursor, uint8_t tag,
+                           const T& val) {
+    uint16_t static_size = get_static_size(val);
+    if (dyn_cursor + static_size > dest_end) return nullptr;
+
+    // Write the tag and offset to the static section of the buffer.
+    uint16_t offset = dyn_cursor - (dest + 1);  // +1 because the tag comes before the offset
+    dest[0] = tag;
+    dest[1] = offset >> 8;
+    dest[2] = offset & 0xFF;
+
+    return write_field(dyn_cursor, dest_end, dyn_cursor + static_size, val);
+}
+
 }  // namespace simplebuffers
 
 #endif  // SIMPLEBUFFERS__SIMPLEBUFFERS__ZACHDACHAMPION__HPP
