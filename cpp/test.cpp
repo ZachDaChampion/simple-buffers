@@ -12,7 +12,10 @@ Sequence X {
     a: u8;
     b: string;
     c: [Y];
-    f: Y;
+    f: oneof {
+        x: X,
+        y: Y,
+    }
 }
 
 Sequence Y {
@@ -25,17 +28,59 @@ Sequence Y {
 class XWriter;
 class YWriter;
 
-class ZWriter;
-
 class XWriter : public SimpleBufferWriter {
    public:
-    XWriter(uint8_t a, char* b, ArrayWriter<YWriter> c) : a(a), b(b), c(c) {}
+    class FWriter : public OneOfWriter {
+       public:
+        enum class Tag : uint8_t {
+            X = 0,
+            Y = 1,
+        };
+
+        union Value {
+            XWriter* x;
+            YWriter* y;
+        };
+
+        static FWriter X(XWriter* val) {
+            Value v;
+            v.x = val;
+            return FWriter(Tag::X, v);
+        }
+
+        static FWriter Y(YWriter* val) {
+            Value v;
+            v.y = val;
+            return FWriter(Tag::Y, v);
+        }
+
+        uint8_t* write_component(uint8_t* dest, const uint8_t* dest_end,
+                                 uint8_t* dyn_cursor) const override {
+            switch (tag) {
+                case Tag::X:
+                    return write_oneof_field(dest, dest_end, dyn_cursor, 0, *value.x);
+                case Tag::Y:
+                    return write_oneof_field(dest, dest_end, dyn_cursor, 1, *value.y);
+                default:
+                    return nullptr;
+            }
+        }
+
+       private:
+        FWriter(Tag tag, Value value) : tag(tag), value(value) {}
+
+        Tag tag;
+        Value value;
+    };
+
+    XWriter(uint8_t a, char* b, ArrayWriter<YWriter> c, FWriter f) : a(a), b(b), c(c), f(f) {}
 
     uint8_t a;
     char* b;
     ArrayWriter<YWriter> c;
+    FWriter f;
 
-    uint16_t static_size() const override { return 5; }
+    uint16_t static_size() const override { return 8; }
 
     uint8_t* write_component(uint8_t* dest, const uint8_t* dest_end,
                              uint8_t* dyn_cursor) const override {
@@ -47,6 +92,9 @@ class XWriter : public SimpleBufferWriter {
         if (dyn_cursor == nullptr) return nullptr;
         dest += get_static_size(b);
         dyn_cursor = write_field(dest, dest_end, dyn_cursor, c);
+        if (dyn_cursor == nullptr) return nullptr;
+        dest += get_static_size(c);
+        dyn_cursor = write_field(dest, dest_end, dyn_cursor, f);
         if (dyn_cursor == nullptr) return nullptr;
         return dyn_cursor;
     }
@@ -73,48 +121,14 @@ class YWriter : public SimpleBufferWriter {
     }
 };
 
-class ZWriter : public SimpleBufferWriter {
-   public:
-    enum class Tag : uint8_t {
-        X = 0,
-        Y = 1,
-    };
-
-    union Type {
-        XWriter x;
-        YWriter y;
-    };
-
-    ZWriter(Tag tag, const Type* val) : tag(tag), val(val) {}
-
-    Tag tag;
-    const Type* val;
-
-    uint16_t static_size() const override { return 3; }
-
-    uint8_t* write_component(uint8_t* dest, const uint8_t* dest_end,
-                             uint8_t* dyn_cursor) const override {
-        if (dest_end - dest < 2) return nullptr;
-        switch (tag) {
-            case Tag::X:
-                dyn_cursor = write_oneof_field(dest, dest_end, dyn_cursor, (uint8_t)tag, val->x);
-                break;
-            case Tag::Y:
-                dyn_cursor = write_oneof_field(dest, dest_end, dyn_cursor, (uint8_t)tag, val->y);
-                break;
-        }
-        return dyn_cursor;
-    }
-};
-
 uint8_t buffer[512];
 
 int main() {
     YWriter c_writers[] = {YWriter(1, "c1"), YWriter(2, "c2")};
-    XWriter x_writer(5, "b str", ArrayWriter<YWriter>(c_writers, 2));
-    ZWriter z_writer(ZWriter::Tag::X, (const ZWriter::Type*)&x_writer);
+    XWriter x_writer(5, "b str", ArrayWriter<YWriter>(c_writers, 2),
+                     XWriter::FWriter::Y(&c_writers[1]));
 
-    int32_t bytes_written = z_writer.write(buffer, 512);
+    int32_t bytes_written = x_writer.write(buffer, 512);
 
     cout << "bytes written: " << bytes_written << endl;
     for (int i = 0; i < bytes_written; i++) {
