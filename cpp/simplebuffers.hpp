@@ -208,6 +208,25 @@ uint8_t* ArrayWriter<int8_t>::write_data_(uint8_t* dest, const uint8_t* dest_end
 }
 
 //                                                                                                //
+// ======================================== OneOfWriter ========================================= //
+//                                                                                                //
+
+/**
+ * @brief An abstract class for writing OneOf fields to a simple buffer. Specific OneOf writers
+ *        should inherit from this class.
+ */
+class OneOfWriter : public SimpleBufferWriter {
+   public:
+    /**
+     * @brief The static size of all OneOf structures is 3 bytes: 1 byte for the tag and 2 bytes for
+     *        the offset.
+     *
+     * @return The static size of the OneOf structure (3);
+     */
+    uint16_t static_size() const override { return 3; }
+};
+
+//                                                                                                //
 // ====================================== Get static size ======================================= //
 //                                                                                                //
 
