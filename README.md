@@ -164,7 +164,7 @@ block-beta
     space:4
     block:serstatic:3
         serjointslen["0x0300"]
-        serjointsptr["0x0500 (offset)"]
+        serjointsptr["0x0300 (offset)"]
         serstop["0x01"]
     end
     block:serdyn:1
@@ -213,7 +213,7 @@ block-beta
     block:bser0:3
         serid["0x00000000"]
         serpayloadtype["0x00"]
-        serpayloadoffset["0x0001 (offset)"]
+        serpayloadoffset["0x0002 (offset)"]
     end
     block:serdyn:1
         serfw["0x03"]
@@ -255,7 +255,7 @@ block-beta
     space:2
     block:bdyn0:3
         serjointslen["0x03"]
-        serjointsptr["0x0002 (offset)"]
+        serjointsptr["0x0003 (offset)"]
         serstop["0x01"]
     end
     block:serdyn1:1
