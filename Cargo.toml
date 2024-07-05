@@ -1,15 +1,9 @@
-[package]
-name = "simple-buffers"
-version = "0.1.0"
-edition = "2021"
+[workspace]
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+resolver = "2"
 
-[dependencies]
-colored = "2.0.4"
-indoc = "2.0.4"
-itertools = "0.12.1"
-lazy_static = "1.4.0"
-regex = "1.9.5"
-regex-macro = "0.2.0"
-termsize = "0.1.6"
+members = [
+    "simplebuffers-core",
+    "simplebuffers-compiler",
+    "simplebuffers-codegen",
+]

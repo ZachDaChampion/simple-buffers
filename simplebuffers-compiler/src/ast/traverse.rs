@@ -119,6 +119,7 @@ pub trait TreeTraversal {
     type DepthFirstIterator;
 
     /// Iterate over the tree in breadth-first order.
+    #[allow(dead_code)]
     fn iter_breadth_first(&self) -> Self::BreadthFirstIterator;
 
     /// Iterate over the tree in depth-first order.

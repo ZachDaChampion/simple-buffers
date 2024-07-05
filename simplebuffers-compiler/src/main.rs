@@ -1,13 +1,10 @@
-use ast::{SyntaxTree, TaggedSyntaxTree};
-use compiler::ParseResult;
-use std::{collections::LinkedList, error::Error};
-
-use crate::compiler::{Enum, EnumVariant};
-
 mod ast;
 mod compiler;
-mod indent;
 mod tokenizer;
+
+use ast::{SyntaxTree, TaggedSyntaxTree};
+use simplebuffers_core::{Enum, EnumVariant, SBSchema, Type};
+use std::{collections::LinkedList, error::Error};
 
 fn main() {
     // Load test.sb into a string.
@@ -129,7 +126,7 @@ fn print_ast(ast: &TaggedSyntaxTree<'_>) -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-fn print_parsed(parsed: ParseResult) -> Result<(), Box<dyn Error>> {
+fn print_parsed(parsed: SBSchema) -> Result<(), Box<dyn Error>> {
     print!(concat!(
         "=========================\n",
         "|         ENUMS         |\n",
@@ -164,15 +161,15 @@ fn print_parsed(parsed: ParseResult) -> Result<(), Box<dyn Error>> {
                     );
                 }
                 match &field_type {
-                    compiler::Type::Primitive(name) => println!("{} (primitive)", name),
-                    compiler::Type::Sequence(name) => println!("{} (sequence)", name),
-                    compiler::Type::Enum(name) => println!("{} (enum)", name),
-                    compiler::Type::Array(ty) => {
+                    Type::Primitive(name) => println!("{} (primitive)", name),
+                    Type::Sequence(name) => println!("{} (sequence)", name),
+                    Type::Enum(name) => println!("{} (enum)", name),
+                    Type::Array(ty) => {
                         print!("ARRAY OF ");
                         stack.push_back((None, ty, 0));
                     }
-                    compiler::Type::String => println!("string"),
-                    compiler::Type::OneOf(f) => {
+                    Type::String => println!("string"),
+                    Type::OneOf(f) => {
                         println!("ONE OF:");
                         for field in f.iter().rev() {
                             stack.push_back((Some(field.name.clone()), &field.ty, field.index));

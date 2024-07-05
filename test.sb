@@ -30,6 +30,6 @@ sequence MoveToEntry {
 }
 
 sequence StringTest {
-    t: string;
-    string: i16;
+    test: string;
+    string: i64;
 }
