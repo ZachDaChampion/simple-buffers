@@ -188,8 +188,8 @@ block-beta
     space
     space:4
     block:serstatic:3
-        serjointslen["0x0300"]
-        serjointsptr["0x0300 (offset)"]
+        serjointslen["0x0003"]
+        serjointsptr["0x0003 (offset)"]
         serstop["0x01"]
     end
     block:serdyn:1
