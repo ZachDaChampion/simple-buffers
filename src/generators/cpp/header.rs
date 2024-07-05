@@ -1,11 +1,9 @@
 //! This file contains the code for generating C++ header files.
 
 use indoc::{formatdoc, indoc};
+use itertools::Itertools;
 
-use crate::{
-    compiler::{Field, Sequence},
-    generators::cpp::primitive_to_cpp_type,
-};
+use crate::compiler::{Enum, Field, ParseResult, Sequence, Type};
 
 /// Returns the code that goes at the top of a header file.
 fn file_header(file_name: String, hpp: bool) -> String {
@@ -28,33 +26,6 @@ fn file_header(file_name: String, hpp: bool) -> String {
     }
 }
 
-/// Returns the code for a sequence.
-fn sequence(sequence: Sequence) -> String {
-    let mut result = formatdoc! {r#"
-        class {name} {{
-           public:
-        "#,
-        name = sequence.name
-    };
-
-    todo!("Add fields");
-
-    result
-}
-
-/// Returns the code for a field.
-fn field(field: Field) -> String {
-    use crate::compiler::Type as T;
-    match field.ty {
-        T::Primitive(primitive) => format!(
-            "{ty} read_{name}() const;",
-            ty = primitive_to_cpp_type(primitive),
-            name = field.name
-        ),
-        _ => todo!("Add support for non-primitive types"),
-    }
-}
-
 /// Returns the code that goes at the bottom of a header file.
 fn file_footer() -> String {
     indoc! {r"
@@ -63,4 +34,48 @@ fn file_footer() -> String {
             #endif
         "}
     .to_string()
+}
+
+/// Generate the C++ code for defining an enum.
+fn define_enum(data: &Enum) -> String {
+    formatdoc! {r#"
+        enum class {name} {{
+            {variants}
+        }};
+        "#,
+    name = data.name,
+    variants = data
+        .variants
+        .iter()
+        .map(|v| format!("{} = {}", v.name, v.value))
+        .join(",\n")
+    }
+}
+
+/// Generate the C++ code for sequence writer forward declarations.
+fn forward_declare_writer(data: &Sequence) -> String {
+    format!("class {}Writer : public SimpleBufferWriter;", data.name)
+}
+
+/// Generate the code for a C++ header file.
+pub fn generate(file_name: String, data: ParseResult, hpp: bool) -> String {
+    let enums = data.enums.iter().map(define_enum).join("\n");
+    let writer_forward_declarations = data.sequences.iter().map(forward_declare_writer).join("\n");
+
+    todo!("Define classes");
+    let member_specifications = "";
+
+    formatdoc! {r#"
+        {header}
+        {enums}
+        {forward_declarations}
+        {member_specifications}
+        {footer}
+    "#,
+    header = file_header(file_name, hpp),
+    enums = enums,
+    forward_declarations = writer_forward_declarations,
+    member_specifications = member_specifications,
+    footer = file_footer()
+    }
 }

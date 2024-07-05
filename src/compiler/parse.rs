@@ -155,7 +155,7 @@ pub struct EnumVariant {
     pub name: String,
 
     /// The value of the variant.
-    pub value: i32,
+    pub value: u8,
 }
 
 /// Determines whether a structure is a sequence or an enum.
@@ -381,7 +381,7 @@ fn parse_enum<'a>(
     for entry in entries {
         if let SyntaxTree::EnumEntry(entry_name, entry_value) = &entry.data {
             // Check if the entry value is a valid integer.
-            let parsed_value = match entry_value.parse::<i32>() {
+            let parsed_value = match entry_value.parse::<u8>() {
                 Ok(value) => value,
                 Err(_) => {
                     let full_name = format!("{}:{}", name, entry_name);
