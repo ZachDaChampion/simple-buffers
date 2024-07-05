@@ -6,7 +6,6 @@ use crate::compiler::{Enum, EnumVariant};
 
 mod ast;
 mod compiler;
-mod generators;
 mod indent;
 mod tokenizer;
 
@@ -172,6 +171,7 @@ fn print_parsed(parsed: ParseResult) -> Result<(), Box<dyn Error>> {
                         print!("ARRAY OF ");
                         stack.push_back((None, ty, 0));
                     }
+                    compiler::Type::String => println!("string"),
                     compiler::Type::OneOf(f) => {
                         println!("ONE OF:");
                         for field in f.iter().rev() {

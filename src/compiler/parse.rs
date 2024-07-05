@@ -8,7 +8,7 @@ use core::fmt;
 use std::collections::HashMap;
 
 /// Array of primitive names and internal representations.
-const PRIMITIVES: [(&str, Primitive); 13] = [
+const PRIMITIVES: [(&str, Primitive); 11] = [
     ("bool", Primitive::Bool),
     ("i8", Primitive::I8),
     ("i16", Primitive::I16),
@@ -20,8 +20,6 @@ const PRIMITIVES: [(&str, Primitive); 13] = [
     ("u64", Primitive::U64),
     ("f32", Primitive::F32),
     ("f64", Primitive::F64),
-    ("string", Primitive::String),
-    ("bytes", Primitive::Bytes),
 ];
 
 /// A primitive type.
@@ -38,8 +36,6 @@ pub enum Primitive {
     U64,
     F32,
     F64,
-    String,
-    Bytes,
 }
 
 impl Primitive {
@@ -57,8 +53,6 @@ impl Primitive {
             Primitive::U64 => 8,
             Primitive::F32 => 4,
             Primitive::F64 => 8,
-            Primitive::String => 2, // 16-bit offset to actual string
-            Primitive::Bytes => 2,  // 16-bit offset to actual bytes
         }
     }
 }
@@ -77,8 +71,6 @@ impl fmt::Display for Primitive {
             Primitive::U64 => write!(f, "u64"),
             Primitive::F32 => write!(f, "f32"),
             Primitive::F64 => write!(f, "f64"),
-            Primitive::String => write!(f, "string"),
-            Primitive::Bytes => write!(f, "bytes"),
         }
     }
 }
@@ -121,6 +113,9 @@ pub enum Type {
     /// An array type.
     Array(Box<Type>),
 
+    /// A string type.
+    String,
+
     /// A oneof type. This is a type that can be one of several types.
     OneOf(Vec<Field>),
 }
@@ -135,6 +130,7 @@ impl Type {
             Self::Sequence(_) => 2, // 16-bit offset to actual sequence
             Self::Enum(_) => 1,     // 8-bit enum value
             Self::Array(_) => 4,    // 16-bit array length + 16-bit offset to actual array
+            Self::String => 2,      // 16-bit offset
             Self::OneOf(_) => 3,    // 8-bit index + 16-bit offset to actual field
         }
     }
@@ -305,22 +301,23 @@ fn parse_type<'a>(
         // Type is a simple named type. This can be a primitive, sequence, or enum. Verify that the
         // type is valid and parse it.
         SyntaxTree::Type(name) => {
+            // Check if the type is a string.
+            if name == "string" {
+                Ok(Type::String)
+            }
             // Check if the type is a sequence or enum.
-            if let Some(struct_type) = struct_map.get(name) {
+            else if let Some(struct_type) = struct_map.get(name) {
                 match struct_type {
                     StructType::Sequence => Ok(Type::Sequence(name.clone())),
                     StructType::Enum => Ok(Type::Enum(name.clone())),
                 }
             }
-            // Type is not a sequence or enum. Check if it is a primitive.
+            // Type is not a string, sequence, or enum. Check if it is a primitive.
+            else if let Some(found) = PRIMITIVES.iter().find(|&x| x.0 == name) {
+                Ok(Type::Primitive(found.1.clone()))
+            }
+            // Type is not a primitive, string, sequence, or enum. Error.
             else {
-                for (primitive_name, primitive) in PRIMITIVES.iter() {
-                    if name == *primitive_name {
-                        return Ok(Type::Primitive(primitive.clone()));
-                    }
-                }
-
-                // Type is not a primitive, sequence, or enum. Error.
                 Err(Box::new(CompilerError::new(
                     ty.token.clone(),
                     format!("Type \"{}\" is not a valid type", name),
