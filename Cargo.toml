@@ -6,4 +6,5 @@ members = [
     "simplebuffers-core",
     "simplebuffers-compiler",
     "simplebuffers-codegen",
+    "simplebuffers-sanitycheck",
 ]

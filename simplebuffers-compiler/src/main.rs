@@ -1,186 +1,106 @@
+use std::path::Path;
+
+use clap::Parser;
+use generators::GENERATORS;
+use libloading::{Library, Symbol};
+use simplebuffers_codegen::{CodeGenerator, GeneratorParams};
+use simplebuffers_core::SBSchema;
+
 mod ast;
 mod compiler;
+mod generators;
 mod tokenizer;
 
-use ast::{SyntaxTree, TaggedSyntaxTree};
-use simplebuffers_core::{Enum, EnumVariant, SBSchema, Type};
-use std::{collections::LinkedList, error::Error};
+const VERSION: &str = env!("CARGO_PKG_VERSION");
+
+/// A struct that holds CLI parameters.
+#[derive(Parser, Debug)]
+#[command(name = "SimpleBuffers Compiler")]
+#[command(version = VERSION)]
+#[command(about = "Compile a SimpleBuffers schema into your chosen language.")]
+struct Cli {
+    /// A custom library to load. This can be used to load third-party generators.
+    #[arg(short, long)]
+    lib: Option<String>,
+
+    /// The name of the code generator to use.
+    generator: String,
+
+    /// The SimpleBuffers file to parse.
+    file: String,
+
+    /// Additional arguments that are specific to the code generator.
+    #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
+    generator_args: Vec<String>,
+}
+
+/// Load a generator from a shared library and run it.
+fn run_from_lib(
+    schema: SBSchema,
+    params: GeneratorParams,
+    path: &str,
+    gen_name: &str,
+) -> Result<(), String> {
+    let loaded_lib =
+        unsafe { Library::new(path).map_err(|_| format!("Failed to load library at '{}'", path)) }?;
+    let loaded_constructor: Symbol<fn() -> Box<dyn CodeGenerator>> = unsafe {
+        loaded_lib
+            .get(gen_name.as_bytes())
+            .map_err(|_| format!("Failed to load generator from '{}'", path))?
+    };
+    let mut generator = loaded_constructor();
+    generator
+        .generate(schema, params)
+        .map_err(|e| format!("GENERATOR ERROR: {}", e))
+}
+
+/// Search for a generator bundled with the SimpleBuffers compiler and run it if found.
+fn run_internal(schema: SBSchema, params: GeneratorParams, gen_name: &str) -> Result<(), String> {
+    if let Some(constructor) = GENERATORS.iter().find(|&x| x.0 == gen_name) {
+        let mut generator = constructor.1();
+        generator
+            .generate(schema, params)
+            .map_err(|e| format!("GENERATOR ERROR: {}", e))
+    } else {
+        Err(format!("No generators found for target {}", gen_name))
+    }
+}
+
+fn main_impl() -> Result<(), String> {
+    let cli = Cli::parse();
+    let generator_args = format!("{} {}", cli.generator.clone(), cli.generator_args.join(" "));
+
+    let raw_schema = std::fs::read_to_string(cli.file.clone())
+        .map_err(|_| format!("Failed to read '{}'", cli.file))?;
+    let mut parser =
+        ast::AstBuilder::new(raw_schema.as_str(), "test").map_err(|_| "Failed to create parser")?;
+    let ast = parser.parse().map_err(|_| "Failed to parse into AST")?;
+    let schema = compiler::parse_ast(&ast).map_err(|_| "Failed to compile AST")?;
+
+    let filename = {
+        let ostr = Path::new(&cli.file)
+            .file_name()
+            .ok_or("Path to schema file is invalid")?;
+        let raw_str = ostr
+            .to_str()
+            .ok_or("Path to schema file contains invalid Unicode")?;
+        raw_str.to_string()
+    };
+
+    let generator_params = GeneratorParams {
+        file_name: filename,
+        additional_args: generator_args,
+    };
+
+    if let Some(lib_path) = cli.lib {
+        run_from_lib(schema, generator_params, &lib_path, &cli.generator)
+    } else {
+        run_internal(schema, generator_params, &cli.generator)
+    }
+}
 
 fn main() {
-    // Load test.sb into a string.
-    let source = std::fs::read_to_string("test.sb").expect("Failed to read test.sb");
-
-    // Run the compiler.
-    println!();
-    if let Err(e) = do_stuff(source) {
-        eprintln!("{}", e);
+    if let Err(e) = main_impl() {
+        println!("{}", e);
     }
-}
-
-enum Visitor<'a, T>
-where
-    T: 'a,
-{
-    Visit(&'a T),
-    Cleanup(&'a T),
-}
-
-fn do_stuff(source: String) -> Result<(), String> {
-    let mut parser =
-        ast::AstBuilder::new(source.as_str(), "test.sb").expect("Failed to create parser");
-    let ast = parser.parse().map_err(|e| e.to_string())?;
-
-    print_ast(&ast).map_err(|e| e.to_string())?;
-
-    let parsed = compiler::parse_ast(&ast).map_err(|e| e.to_string())?;
-    print_parsed(parsed).map_err(|e| e.to_string())?;
-
-    Ok(())
-}
-
-fn print_ast(ast: &TaggedSyntaxTree<'_>) -> Result<(), Box<dyn Error>> {
-    let mut stack = LinkedList::new();
-    stack.push_back(Visitor::Visit(ast));
-    let mut indent = 0;
-
-    print!(concat!(
-        "=========================\n",
-        "|      SYNTAX TREE      |\n",
-        "=========================\n\n"
-    ));
-
-    while let Some(action) = stack.pop_back() {
-        match action {
-            Visitor::Visit(node) => {
-                print!("{}", "|  ".repeat(indent));
-                match &node.data {
-                    SyntaxTree::File(children) => {
-                        println!("File");
-                        stack.push_back(Visitor::Cleanup(node));
-                        for child in children.iter().rev() {
-                            stack.push_back(Visitor::Visit(child));
-                        }
-                        indent += 1;
-                    }
-                    SyntaxTree::Sequence(identifier, fields) => {
-                        println!("Sequence: {}", identifier);
-                        stack.push_back(Visitor::Cleanup(node));
-                        for field in fields.iter().rev() {
-                            stack.push_back(Visitor::Visit(field));
-                        }
-                        indent += 1;
-                    }
-                    SyntaxTree::Field(identifier, field_type) => {
-                        println!("Field: {}", identifier);
-                        stack.push_back(Visitor::Cleanup(node));
-                        stack.push_back(Visitor::Visit(field_type));
-                        indent += 1;
-                    }
-                    SyntaxTree::Enum(identifier, entries) => {
-                        println!("Enum: {}", identifier);
-                        stack.push_back(Visitor::Cleanup(node));
-                        for entry in entries.iter().rev() {
-                            stack.push_back(Visitor::Visit(entry));
-                        }
-                        indent += 1;
-                    }
-                    SyntaxTree::EnumEntry(identifier, value) => {
-                        println!("EnumEntry: {} = {}", identifier, value);
-                        stack.push_back(Visitor::Cleanup(node));
-                    }
-                    SyntaxTree::Type(name) => {
-                        println!("Type: {}", name);
-                        stack.push_back(Visitor::Cleanup(node));
-                    }
-                    SyntaxTree::Array(inner) => {
-                        println!("Array");
-                        stack.push_back(Visitor::Cleanup(node));
-                        stack.push_back(Visitor::Visit(inner));
-                        indent += 1;
-                    }
-                    SyntaxTree::OneOf(fields) => {
-                        println!("OneOf");
-                        stack.push_back(Visitor::Cleanup(node));
-                        for field in fields.iter().rev() {
-                            stack.push_back(Visitor::Visit(field));
-                        }
-                        indent += 1;
-                    }
-                }
-            }
-            Visitor::Cleanup(node) => match node.data {
-                SyntaxTree::File(_)
-                | SyntaxTree::Sequence(_, _)
-                | SyntaxTree::Field(_, _)
-                | SyntaxTree::Enum(_, _)
-                | SyntaxTree::Array(_)
-                | SyntaxTree::OneOf(_) => {
-                    indent -= 1;
-                }
-                _ => {}
-            },
-        }
-    }
-
-    println!();
-    Ok(())
-}
-
-fn print_parsed(parsed: SBSchema) -> Result<(), Box<dyn Error>> {
-    print!(concat!(
-        "=========================\n",
-        "|         ENUMS         |\n",
-        "=========================\n\n"
-    ));
-    for Enum { name, variants } in parsed.enums.iter() {
-        println!("{}:", name);
-        for EnumVariant { name, value } in variants.iter() {
-            println!("  {} = {}", name, value);
-        }
-        println!();
-    }
-
-    print!(concat!(
-        "=========================\n",
-        "|       SEQUENCES       |\n",
-        "=========================\n\n"
-    ));
-    for sequence in parsed.sequences.iter() {
-        println!("{}:", sequence.name);
-        for field in sequence.fields.iter() {
-            let mut indent = 1;
-            let mut stack = LinkedList::new();
-            stack.push_back((Some(field.name.clone()), &field.ty, field.index));
-            while let Some((field_name, field_type, field_offset)) = stack.pop_back() {
-                if let Some(n) = field_name {
-                    print!(
-                        "{indent}{offset} | {name}: ",
-                        offset = field_offset,
-                        indent = "  ".repeat(indent),
-                        name = n
-                    );
-                }
-                match &field_type {
-                    Type::Primitive(name) => println!("{} (primitive)", name),
-                    Type::Sequence(name) => println!("{} (sequence)", name),
-                    Type::Enum(name) => println!("{} (enum)", name),
-                    Type::Array(ty) => {
-                        print!("ARRAY OF ");
-                        stack.push_back((None, ty, 0));
-                    }
-                    Type::String => println!("string"),
-                    Type::OneOf(f) => {
-                        println!("ONE OF:");
-                        for field in f.iter().rev() {
-                            stack.push_back((Some(field.name.clone()), &field.ty, field.index));
-                        }
-                        indent += 1;
-                    }
-                }
-            }
-        }
-        println!();
-    }
-
-    Ok(())
 }

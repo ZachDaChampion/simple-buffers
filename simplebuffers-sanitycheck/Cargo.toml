@@ -1,0 +1,11 @@
+[package]
+name = "simplebuffers-sanitycheck"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+crate-type = ["dylib"]
+
+[dependencies]
+simplebuffers-core = { path = "../simplebuffers-core" }
+simplebuffers-codegen = { path = "../simplebuffers-codegen" }
