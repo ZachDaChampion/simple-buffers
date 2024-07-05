@@ -220,7 +220,7 @@ block-beta
     end
     space:1 down<[" "]>(down):2 space:1
     block:final:4
-        final["00 00 00 00 00 01 03"]:4
+        final["00 00 00 00 02 00 03"]:4
     end
 
     rawid-->serid
@@ -250,7 +250,7 @@ block-beta
     block:bser:3
         serid["0x00000001"]
         serpayloadtype["0x01"]
-        serpayloadoffset["0x0001 (offset)"]
+        serpayloadoffset["0x0002 (offset)"]
     end
     space:2
     block:bdyn0:3
@@ -264,7 +264,7 @@ block-beta
     space:1
     space:2 down<[" "]>(down) space:2
     block:final:5
-        final["01 00 00 00 01 01 00 03 02 00 01 ..."]:5
+        final["01 00 00 00 01 02 00 03 03 00 01 ..."]:5
     end
 
     rawid-->serid
