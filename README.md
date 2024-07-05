@@ -72,14 +72,31 @@ size of an enum is fixed.
 
 ## Fixed-Sized Sequences
 
-Next, let's take a look at our `Init` sequence. It only has a single value: `expected_firmware`,
-which is a 32-bit unsigned integer. Sequences induce zero overhead. This means that the size of
-`Init` is exactly equal to the sum of the sizes of its elements. `Init`, therefore, will always use
-32 bits.
+Next, let's take a look at our `Init` sequence:
 
-`MoveToEntry` also only includes fixed-size elements. `angle` and `speed` are both 32-bit floats,
-and `joint` is an enum. In this case, `RobotJoint` fits into a single octet, so `MoveToEntry` uses
-$32 + 32 + 8 = 72$ bits. The actual serialization of a `MoveEntry` would look like this:
+```
+sequence Init {
+    expected_firmware: u32;
+}
+```
+
+It only has a single value: `expected_firmware`, which is a 32-bit unsigned integer. Sequences
+induce zero overhead. This means that the size of `Init` is exactly equal to the sum of the sizes of
+its elements. `Init`, therefore, will always use 32 bits.
+
+`MoveToEntry` also only includes fixed-size elements:
+
+```
+sequence MoveToEntry {
+    joint: RobotJoint;
+    angle: f32;
+    speed: f32;
+}
+```
+
+ `angle` and `speed` are both 32-bit floats, and `joint` is an enum. In this case, `RobotJoint` fits
+into a single octet, so `MoveToEntry` uses $32 + 32 + 8 = 72$ bits. The actual serialization of a
+`MoveEntry` would look like this:
 
 ```mermaid
 block-beta
@@ -114,10 +131,18 @@ types of data do not have a set size. This data must be encoded differently.
 ## Lists
 
 Lists consist of a variable number of repeated data. Because we do not know the length of the list
-at compile-time, we cannot allocate fixed-size field in a sequence. Take a look at `MoveTo`. We know
-the size of `stop_smoothly`, but `joints` could have any number of elements. This is a problem
-because now we cannot know the position of `stop_smoothly` at compile-time; it will change depending
-on the length of `joints`.
+at compile-time, we cannot allocate fixed-size field in a sequence. Take a look at `MoveTo`:
+
+```
+sequence MoveTo {
+    joints: [MoveToEntry];
+    stop_smoothly: bool;
+}
+```
+
+We know the size of `stop_smoothly`, but `joints` could have any number of elements. This is a
+problem because now we cannot know the position of `stop_smoothly` at compile-time; it will change
+depending on the length of `joints`.
 
 ```mermaid
 block-beta
@@ -200,6 +225,16 @@ than 255 members are unsupported.
 
 Let's take a look at how a `Request` with an `Init` payload would be serialized:
 
+```
+sequence Request {
+    id: u32;            // <-- 0
+    payload: oneof {
+        init: Init;     // <-- .expected_firmware = 3
+        moveTo: MoveTo;
+    };
+}
+```
+
 ```mermaid
 block-beta
     columns 4
@@ -234,6 +269,16 @@ complicated, as `MoveTo` requires its own dynamic sizing. In practice, however, 
 When serializing data, a cursor is placed in the destination buffer at the end of the fixed-sized
 data. Every piece of dynamic data is placed at the cursor position, and the cursor is incremented to
 the end of the new data.
+
+```
+sequence Request {
+    id: u32;            // <-- 1
+    payload: oneof {
+        init: Init;
+        moveTo: MoveTo; // <-- .joints size = 3, .stop_smoothly = true, .joints = ...
+    };
+}
+```
 
 ```mermaid
 block-beta
