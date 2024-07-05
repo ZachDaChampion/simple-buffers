@@ -170,9 +170,9 @@ To solve this, we must find a way to force `joints` to be a fixed size. Fortunat
 already exists: pointers. Instead of storing the full list in `joints`, we can instead store a
 fixed-size pointer and place the list at the end of the buffer, where it can no longer hurt us. In
 practice, we prefer to store a relative offset rather than an absolute pointer, as this allows
-complex sequences to be decomposed more effectively; we will see this later.
+complex sequences to be decomposed more effectively.
 
-We must also encode the size of the list. This is done in the fixed-sized segment, as this allows
+We must also encode the size of the list. This is done in the fixed-sized segment, which allows
 access without indirection. Both the offset and the list size are stored as unsigned 16-bit
 integers.
 
@@ -197,7 +197,7 @@ block-beta
     end
     space:1 down<[" "]>(down):2 space:1
     block:final:4
-        final["03 00 05 00 01 ..."]:4
+        final["03 00 03 00 01 ..."]:4
     end
 
     rawjoints-->serjointsdata
