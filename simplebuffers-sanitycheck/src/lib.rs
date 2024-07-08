@@ -24,8 +24,13 @@ impl CodeGenerator for SanityCheckCodeGenerator {
             "|         ENUMS         |\n",
             "=========================\n\n"
         ));
-        for Enum { name, variants } in schema.enums.iter() {
-            println!("{}:", name);
+        for Enum {
+            name,
+            size,
+            variants,
+        } in schema.enums.iter()
+        {
+            println!("{} ({} bytes):", name, size);
             for EnumVariant { name, value } in variants.iter() {
                 println!("  {} = {}", name, value);
             }

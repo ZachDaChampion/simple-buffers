@@ -4,7 +4,7 @@ use super::CompilerError;
 use crate::ast::{SyntaxTree, TaggedSyntaxTree, TreeTraversal};
 use colored::Colorize;
 use simplebuffers_core::*;
-use std::collections::HashMap;
+use std::{clone, collections::HashMap};
 
 /// Array of primitive names and internal representations.
 const PRIMITIVES: [(&str, Primitive); 11] = [
@@ -231,19 +231,21 @@ fn parse_enum<'a>(
     let mut variants = Vec::<EnumVariant>::new();
 
     // Parse all the entries.
+    let mut enum_size = 1;
     for entry in entries {
         if let SyntaxTree::EnumEntry(entry_name, entry_value) = &entry.data {
             // Check if the entry value is a valid integer.
-            let parsed_value = match entry_value.parse::<u8>() {
+            let parsed_value = match entry_value.parse::<u64>() {
                 Ok(value) => value,
-                Err(_) => {
+                Err(e) => {
                     let full_name = format!("{}:{}", name, entry_name);
                     return Err(Box::new(CompilerError::new(
                         entry.token.clone(),
                         format!(
-                            "Value \"{}\" for enum entry \"{}\" is not a valid integer",
+                            "Value \"{}\" for enum entry \"{}\" is not a valid integer: {}",
                             entry_value.cyan().bold(),
-                            full_name.cyan().bold()
+                            full_name.cyan().bold(),
+                            e.to_string().italic()
                         ),
                     )));
                 }
@@ -275,6 +277,25 @@ fn parse_enum<'a>(
                 }
             }
 
+            // Check if we must increase the size of the enum to accommodate this new value. We do
+            // not have to handle overflows here, since that is checked when we first call
+            // `entry_value.parse::<u64>`. If the provided value is larger than 64 bits, it would
+            // not have been parsed.
+            for (size, max_val) in [
+                (1, u8::MAX.into()),
+                (2, u16::MAX.into()),
+                (4, u32::MAX.into()),
+                (8, u64::MAX),
+            ] {
+                if enum_size > size {
+                    continue;
+                }
+                if parsed_value <= max_val {
+                    enum_size = size;
+                    break;
+                }
+            }
+
             // Add the entry to the enum.
             variants.push(EnumVariant {
                 name: entry_name.clone(),
@@ -285,5 +306,9 @@ fn parse_enum<'a>(
         }
     }
 
-    Ok(Enum { name, variants })
+    Ok(Enum {
+        name,
+        size: enum_size,
+        variants,
+    })
 }

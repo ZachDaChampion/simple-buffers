@@ -119,6 +119,10 @@ pub struct Enum {
     /// The name of the enum.
     pub name: String,
 
+    /// The size of the enum, in bytes. This matches the smallest data type that can fully represent
+    /// the enum and should not be greater than 8 (equivalent to a u64).
+    pub size: u8,
+
     /// The variants of the enum.
     pub variants: Vec<EnumVariant>,
 }
@@ -129,7 +133,7 @@ pub struct EnumVariant {
     pub name: String,
 
     /// The value of the variant.
-    pub value: u8,
+    pub value: u64,
 }
 
 /// A fully parsed SimpleBuffers schema.

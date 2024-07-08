@@ -23,6 +23,14 @@ struct Cli {
     #[arg(short, long)]
     lib: Option<String>,
 
+    /// The directory where your SimpleBuffers schema lives.
+    #[arg(short, long)]
+    srcdir: Option<String>,
+
+    /// The directory to write generated files to.
+    #[arg(short, long)]
+    dstdir: Option<String>,
+
     /// The name of the code generator to use.
     generator: String,
 
