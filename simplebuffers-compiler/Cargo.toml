@@ -15,5 +15,6 @@ termsize = "0.1.6"
 simplebuffers-core = { path = "../simplebuffers-core" }
 simplebuffers-codegen = { path = "../simplebuffers-codegen" }
 simplebuffers-sanitycheck = { path = "../simplebuffers-sanitycheck" }
+simplebuffers-cpp = { path = "../simplebuffers-cpp" }
 clap = { version = "4.5.8", features = ["derive"] }
 libloading = "0.8.4"
