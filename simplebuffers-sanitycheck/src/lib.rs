@@ -4,13 +4,14 @@ use simplebuffers_core::{Enum, EnumVariant, Type};
 #[derive(Debug)]
 pub struct SanityCheckCodeGenerator;
 
-impl SanityCheckCodeGenerator {
-    fn new() -> Self {
+impl CodeGenerator for SanityCheckCodeGenerator {
+    fn new() -> Self
+    where
+        Self: Sized,
+    {
         Self
     }
-}
 
-impl CodeGenerator for SanityCheckCodeGenerator {
     fn generate(
         &mut self,
         schema: simplebuffers_core::SBSchema,
@@ -77,4 +78,4 @@ impl CodeGenerator for SanityCheckCodeGenerator {
     }
 }
 
-register_generator!(sanitycheck, SanityCheckCodeGenerator);
+register_generator!(sanitycheck: SanityCheckCodeGenerator);

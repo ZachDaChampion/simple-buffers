@@ -1,14 +1,14 @@
 use std::path::Path;
 
 use clap::Parser;
-use generators::GENERATORS;
+use internal_generators::get_internal_generator;
 use libloading::{Library, Symbol};
 use simplebuffers_codegen::{CodeGenerator, GeneratorParams};
 use simplebuffers_core::SBSchema;
 
 mod ast;
 mod compiler;
-mod generators;
+mod internal_generators;
 mod tokenizer;
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -56,8 +56,7 @@ fn run_from_lib(
 
 /// Search for a generator bundled with the SimpleBuffers compiler and run it if found.
 fn run_internal(schema: SBSchema, params: GeneratorParams, gen_name: &str) -> Result<(), String> {
-    if let Some(constructor) = GENERATORS.iter().find(|&x| x.0 == gen_name) {
-        let mut generator = constructor.1();
+    if let Some(mut generator) = get_internal_generator(gen_name) {
         generator
             .generate(schema, params)
             .map_err(|e| format!("GENERATOR ERROR: {}", e))

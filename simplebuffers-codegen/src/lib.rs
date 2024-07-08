@@ -13,6 +13,13 @@ pub struct GeneratorParams {
 
 /// A SimpleBuffers code generator.
 pub trait CodeGenerator {
+    /// Construct a new instance of your CodeGenerator. This is used when registering your generator
+    /// from the main compiler and should produce a fully functional instance. If parameters are
+    /// required, they should be parsed dynamically from the `generate` function.
+    fn new() -> Self
+    where
+        Self: Sized;
+
     /// Generate code for encoding and decoding messages.
     ///
     /// # Arguments
@@ -43,26 +50,24 @@ pub trait CodeGenerator {
 ///
 /// pub struct MyGenerator;
 ///
-/// impl MyRustGenerator {
+/// impl CodeGenerator for MyRustGenerator {
 ///     fn new() -> Self {
 ///         Self
 ///     }
-/// }
 ///
-/// impl CodeGenerator for MyRustGenerator {
 ///     fn generate(schema: SBSchema, params: GeneratorParams) -> Result<(), String> {
 ///         // Custom generation logic here...
 ///     }
 /// }
 ///
-/// register_generator!(rust, MyRustGenerator);
-/// register_generator!(rs, MyRustGenerator);
+/// register_generator!(rust: MyRustGenerator);
+/// register_generator!(rs: MyRustGenerator);
 /// ```
 macro_rules! register_generator {
-    ($name:ident, $generator:ty) => {
+    ($name:ident : $generator:ty) => {
         #[no_mangle]
         pub extern "C" fn $name() -> Box<dyn CodeGenerator> {
-            Box::new(<$generator>::new())
+            Box::new(<$generator as CodeGenerator>::new())
         }
     };
 }
