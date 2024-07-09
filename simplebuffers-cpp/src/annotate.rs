@@ -103,6 +103,26 @@ impl ToReaderWriterString for CppType {
     }
 }
 
+impl ToReaderWriterString for CppSequence {
+    fn to_writer_string(&self, params: &CppGeneratorParams) -> String {
+        format!("{}_Writer", self.name).to_case(params.class_case)
+    }
+
+    fn to_reader_string(&self, params: &CppGeneratorParams) -> String {
+        format!("{}_Reader", self.name).to_case(params.class_case)
+    }
+}
+
+impl ToReaderWriterString for CppOneOf {
+    fn to_writer_string(&self, params: &CppGeneratorParams) -> String {
+        format!("{}_Writer", self.name).to_case(params.class_case)
+    }
+
+    fn to_reader_string(&self, params: &CppGeneratorParams) -> String {
+        format!("{}_Reader", self.name).to_case(params.class_case)
+    }
+}
+
 /// Take a schema and annotate it for use with C++. This will adjust naming to match C++ convention,
 /// and will add extra data that is necessary for C++ code generation.
 pub(crate) fn annotate_schema(params: &CppGeneratorParams, schema: SBSchema) -> CppSchema {
