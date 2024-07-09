@@ -74,7 +74,8 @@ fn print_sequences(sequences: &[Sequence]) {
 
             // Run through the stack of the current field.
             while let Some((field_name, field_type, field_offset)) = stack.pop() {
-                // For named fields, print the name.
+                // For named fields, print the name and offset on a new line. Unnamed fields (array
+                // elements) are printed inline.
                 if let Some(n) = field_name {
                     print!(
                         "{indent}{offset} | {name}: ",
