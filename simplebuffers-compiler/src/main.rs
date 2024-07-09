@@ -1,4 +1,4 @@
-use std::path::Path;
+use std::{path::Path, process::ExitCode};
 
 use clap::Parser;
 use internal_generators::get_internal_generator;
@@ -107,8 +107,11 @@ fn main_impl() -> Result<(), String> {
     }
 }
 
-fn main() {
+fn main() -> ExitCode {
     if let Err(e) = main_impl() {
         println!("{}", e);
+        ExitCode::FAILURE
+    } else {
+        ExitCode::SUCCESS
     }
 }
