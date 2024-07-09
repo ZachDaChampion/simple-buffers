@@ -81,8 +81,8 @@ fn main_impl() -> Result<(), String> {
         .map_err(|_| format!("Failed to read '{}'", cli.file))?;
     let mut parser =
         ast::AstBuilder::new(raw_schema.as_str(), "test").map_err(|_| "Failed to create parser")?;
-    let ast = parser.parse().map_err(|_| "Failed to parse into AST")?;
-    let schema = compiler::parse_ast(&ast).map_err(|_| "Failed to compile AST")?;
+    let ast = parser.parse().map_err(|e| e.to_string())?;
+    let schema = compiler::parse_ast(&ast).map_err(|e| e.to_string())?;
 
     let filename = {
         let ostr = Path::new(&cli.file)
