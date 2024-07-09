@@ -71,6 +71,38 @@ pub(crate) struct CppOneOf {
     pub fields: Vec<CppField>,
 }
 
+/// This trait is implemented for fields and types that must be represented in specific ways for
+/// Readers and Writers.
+pub(crate) trait ToReaderWriterString {
+    /// Convert to a Writer name.
+    fn to_writer_string(&self, params: &CppGeneratorParams) -> String;
+
+    /// Convert to a Reader name.
+    fn to_reader_string(&self, params: &CppGeneratorParams) -> String;
+}
+
+impl ToReaderWriterString for CppType {
+    fn to_writer_string(&self, params: &CppGeneratorParams) -> String {
+        match self {
+            CppType::Primitive(p) => p.to_string(),
+            CppType::Sequence(s) => format!("{}_Writer", s).to_case(params.class_case),
+            CppType::Enum(e) => e.clone(),
+            CppType::Array(t) => format!("ArrayWriter<{}>", t.to_writer_string(params)),
+            CppType::OneOf(o) => format!("{}_Writer", o.name).to_case(params.class_case),
+        }
+    }
+
+    fn to_reader_string(&self, params: &CppGeneratorParams) -> String {
+        match self {
+            CppType::Primitive(p) => p.to_string(),
+            CppType::Sequence(s) => format!("{}_Reader", s).to_case(params.class_case),
+            CppType::Enum(e) => e.clone(),
+            CppType::Array(t) => format!("ArrayReader<{}>", t.to_writer_string(params)),
+            CppType::OneOf(o) => format!("{}_Reader", o.name).to_case(params.class_case),
+        }
+    }
+}
+
 /// Take a schema and annotate it for use with C++. This will adjust naming to match C++ convention,
 /// and will add extra data that is necessary for C++ code generation.
 pub(crate) fn annotate_schema(params: &CppGeneratorParams, schema: SBSchema) -> CppSchema {

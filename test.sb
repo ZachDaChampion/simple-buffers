@@ -12,6 +12,10 @@ sequence Request {
     payload: oneof {
         init: Init;
         moveTo: MoveTo;
+        testOneOf: oneof {
+            moveToEntry: MoveToEntry;
+            stringTest: StringTest;
+        };
     };
 }
 
