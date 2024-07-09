@@ -4,7 +4,7 @@ use super::CompilerError;
 use crate::ast::{SyntaxTree, TaggedSyntaxTree, TreeTraversal};
 use colored::Colorize;
 use simplebuffers_core::*;
-use std::{clone, collections::HashMap};
+use std::collections::HashMap;
 
 /// Array of primitive names and internal representations.
 const PRIMITIVES: [(&str, Primitive); 11] = [

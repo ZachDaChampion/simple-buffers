@@ -1,4 +1,3 @@
-use convert_case::Case;
 use convert_case::Casing;
 use simplebuffers_core::Enum;
 use simplebuffers_core::Field;
@@ -7,18 +6,16 @@ use simplebuffers_core::SBSchema;
 use simplebuffers_core::Sequence;
 use simplebuffers_core::Type;
 
-use Case::Pascal as SequenceCase;
-use Case::Pascal as EnumCase;
-use Case::Pascal as OneOfCase;
-use Case::Snake as FieldCase;
-use Case::UpperSnake as EnumVarCase;
+use crate::argparse::CppGeneratorParams;
 
+#[derive(Debug)]
 pub(crate) struct CppSchema {
     pub sequences: Vec<CppSequence>,
     pub enums: Vec<CppEnum>,
 }
 
 /// An enum, annotated and adjusted for C++ conventions.
+#[derive(Debug)]
 pub(crate) struct CppEnum {
     /// The name of the enum.
     pub name: String,
@@ -31,6 +28,7 @@ pub(crate) struct CppEnum {
 }
 
 /// A sequence, annotated and adjusted for C++ conventions.
+#[derive(Debug)]
 pub(crate) struct CppSequence {
     /// The name of the sequence.
     pub name: String,
@@ -40,6 +38,7 @@ pub(crate) struct CppSequence {
 }
 
 /// A field, annotated and adjusted for C++ conventions.
+#[derive(Debug)]
 pub(crate) struct CppField {
     /// The name of the field.
     pub name: String,
@@ -53,6 +52,7 @@ pub(crate) struct CppField {
 }
 
 /// A type, annotated and adjusted for C++ conventions.
+#[derive(Debug)]
 pub(crate) enum CppType {
     Primitive(&'static str),
     Sequence(String),
@@ -62,6 +62,7 @@ pub(crate) enum CppType {
 }
 
 /// A oneof, annotated and adjusted for C++ conventions.
+#[derive(Debug)]
 pub(crate) struct CppOneOf {
     /// The name of the oneof.
     pub name: String,
@@ -72,10 +73,18 @@ pub(crate) struct CppOneOf {
 
 /// Take a schema and annotate it for use with C++. This will adjust naming to match C++ convention,
 /// and will add extra data that is necessary for C++ code generation.
-pub(crate) fn annotate_schema(schema: SBSchema) -> CppSchema {
+pub(crate) fn annotate_schema(params: &CppGeneratorParams, schema: SBSchema) -> CppSchema {
     CppSchema {
-        sequences: schema.sequences.iter().map(annotate_sequence).collect(),
-        enums: schema.enums.iter().map(annotate_enum).collect(),
+        sequences: schema
+            .sequences
+            .iter()
+            .map(|s| annotate_sequence(params, s))
+            .collect(),
+        enums: schema
+            .enums
+            .iter()
+            .map(|e| annotate_enum(params, e))
+            .collect(),
     }
 }
 
@@ -88,14 +97,14 @@ pub(crate) fn annotate_schema(schema: SBSchema) -> CppSchema {
 /// # Returns
 ///
 /// An enum, formatted for C++ code generation.
-fn annotate_enum(original: &Enum) -> CppEnum {
+fn annotate_enum(params: &CppGeneratorParams, original: &Enum) -> CppEnum {
     CppEnum {
-        name: original.name.to_case(EnumCase),
+        name: original.name.to_case(params.class_case),
         size: original.size,
         variants: original
             .variants
             .iter()
-            .map(|v| (v.name.to_case(EnumVarCase), v.value))
+            .map(|v| (v.name.to_case(params.enum_var_case), v.value))
             .collect(),
     }
 }
@@ -109,10 +118,14 @@ fn annotate_enum(original: &Enum) -> CppEnum {
 /// # Returns
 ///
 /// A sequence, formatted for C++ code generation.
-fn annotate_sequence(seq: &Sequence) -> CppSequence {
+fn annotate_sequence(params: &CppGeneratorParams, seq: &Sequence) -> CppSequence {
     CppSequence {
-        name: seq.name.to_case(SequenceCase),
-        fields: seq.fields.iter().map(annotate_field).collect(),
+        name: seq.name.to_case(params.class_case),
+        fields: seq
+            .fields
+            .iter()
+            .map(|f| annotate_field(params, f))
+            .collect(),
     }
 }
 
@@ -125,10 +138,10 @@ fn annotate_sequence(seq: &Sequence) -> CppSequence {
 /// # Returns
 ///
 /// An annotated CppField.
-fn annotate_field(field: &Field) -> CppField {
+fn annotate_field(params: &CppGeneratorParams, field: &Field) -> CppField {
     CppField {
-        name: field.name.to_case(FieldCase),
-        ty: annotate_type(&field.ty, field.name.as_str()),
+        name: field.name.to_case(params.field_case),
+        ty: annotate_type(params, &field.ty, field.name.as_str()),
         index: field.index,
     }
 }
@@ -143,7 +156,7 @@ fn annotate_field(field: &Field) -> CppField {
 /// # Returns
 ///
 /// An annotated CppType.
-fn annotate_type(ty: &Type, field_name: &str) -> CppType {
+fn annotate_type(params: &CppGeneratorParams, ty: &Type, field_name: &str) -> CppType {
     match ty {
         Type::Primitive(p) => CppType::Primitive(match p {
             Primitive::Bool => "bool",
@@ -158,11 +171,11 @@ fn annotate_type(ty: &Type, field_name: &str) -> CppType {
             Primitive::F32 => "float",
             Primitive::F64 => "double",
         }),
-        Type::Sequence(s) => CppType::Sequence(s.to_case(SequenceCase)),
-        Type::Enum(e) => CppType::Enum(e.to_case(EnumCase)),
-        Type::Array(t) => CppType::Array(Box::new(annotate_type(t, field_name))),
+        Type::Sequence(s) => CppType::Sequence(s.to_case(params.class_case)),
+        Type::Enum(e) => CppType::Enum(e.to_case(params.class_case)),
+        Type::Array(t) => CppType::Array(Box::new(annotate_type(params, t, field_name))),
         Type::String => CppType::Primitive("char*"),
-        Type::OneOf(o) => CppType::OneOf(annotate_oneof(o, field_name)),
+        Type::OneOf(o) => CppType::OneOf(annotate_oneof(params, o, field_name)),
     }
 }
 
@@ -176,14 +189,18 @@ fn annotate_type(ty: &Type, field_name: &str) -> CppType {
 /// # Returns
 ///
 /// An annotated CppOneOf.
-fn annotate_oneof(subfields: &Vec<Field>, field_name: &str) -> CppOneOf {
+fn annotate_oneof(
+    params: &CppGeneratorParams,
+    subfields: &Vec<Field>,
+    field_name: &str,
+) -> CppOneOf {
     CppOneOf {
-        name: field_name.to_case(OneOfCase),
+        name: field_name.to_case(params.class_case),
         fields: (subfields
             .iter()
             .map(|f| CppField {
-                name: f.name.to_case(FieldCase),
-                ty: annotate_type(&f.ty, f.name.as_str()),
+                name: f.name.to_case(params.field_case),
+                ty: annotate_type(params, &f.ty, f.name.as_str()),
                 index: f.index,
             })
             .collect()),

@@ -1,9 +1,13 @@
 use simplebuffers_core::SBSchema;
 
 /// Parameters for code generators.
+#[derive(Debug)]
 pub struct GeneratorParams {
     /// The name of the generated file.
     pub file_name: String,
+
+    /// The directory to write generated files to.
+    pub dest_dir: String,
 
     /// Additional arguments passed to the compiler. These are likely to be generator-specific
     /// parameters and should be parsed appropriately. The [clap](https://docs.rs/clap/latest/clap/)

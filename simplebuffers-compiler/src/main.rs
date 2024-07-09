@@ -86,7 +86,7 @@ fn main_impl() -> Result<(), String> {
 
     let filename = {
         let ostr = Path::new(&cli.file)
-            .file_name()
+            .file_stem()
             .ok_or("Path to schema file is invalid")?;
         let raw_str = ostr
             .to_str()
@@ -96,6 +96,7 @@ fn main_impl() -> Result<(), String> {
 
     let generator_params = GeneratorParams {
         file_name: filename,
+        dest_dir: cli.dstdir.unwrap_or("".to_string()),
         additional_args: generator_args,
     };
 
