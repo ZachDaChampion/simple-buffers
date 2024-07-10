@@ -1,7 +1,7 @@
 use simplebuffers_core::SBSchema;
 
 /// Parameters for code generators.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct GeneratorParams {
     /// The name of the generated file.
     pub file_name: String,
@@ -34,7 +34,11 @@ pub trait CodeGenerator {
     /// # Returns
     ///
     /// A `Result` indicating whether the operation was successful.
-    fn generate(&mut self, schema: SBSchema, params: GeneratorParams) -> Result<(), String>;
+    fn generate(&mut self, schema: &SBSchema, params: &GeneratorParams) -> Result<(), String>;
+
+    /// Returns a list of reserved identifiers in the generated language. The compiler will ensure
+    /// that these identifiers are not used anywhere in the schema before calling `generate`.
+    fn reserved_identifiers(&mut self, params: &GeneratorParams) -> Vec<String>;
 }
 
 #[macro_export]
@@ -59,8 +63,15 @@ pub trait CodeGenerator {
 ///         Self
 ///     }
 ///
-///     fn generate(schema: SBSchema, params: GeneratorParams) -> Result<(), String> {
+///     fn generate(&mut self, schema: &SBSchema, params: &GeneratorParams) -> Result<(), String> {
 ///         // Custom generation logic here...
+///     }
+///
+///     fn reserved_identifiers(&mut self, _params: &GeneratorParams) -> String {
+///         vec!["if", "for", "while"]
+///             .iter()
+///             .map(|s| s.to_string())
+///             .collect()
 ///     }
 /// }
 ///

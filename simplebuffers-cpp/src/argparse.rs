@@ -91,7 +91,7 @@ pub(crate) struct CppGeneratorParams {
 }
 
 /// Parse generator-specific arguments from an input string.
-pub(crate) fn parse_args(generator_params: GeneratorParams) -> CppGeneratorParams {
+pub(crate) fn parse_args(generator_params: &GeneratorParams) -> CppGeneratorParams {
     let cli = CLI::parse_from(generator_params.additional_args.split_ascii_whitespace());
     CppGeneratorParams {
         header_dir: cli.headerdir.unwrap_or(generator_params.dest_dir.clone()),
@@ -100,6 +100,6 @@ pub(crate) fn parse_args(generator_params: GeneratorParams) -> CppGeneratorParam
         field_case: cli.fieldcase.unwrap_or(CaseOption::Snake).into(),
         ns_case: cli.nscase.unwrap_or(CaseOption::Snake).into(),
 
-        global: generator_params,
+        global: generator_params.clone(),
     }
 }

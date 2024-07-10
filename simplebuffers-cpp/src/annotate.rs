@@ -125,7 +125,7 @@ impl ToReaderWriterString for CppOneOf {
 
 /// Take a schema and annotate it for use with C++. This will adjust naming to match C++ convention,
 /// and will add extra data that is necessary for C++ code generation.
-pub(crate) fn annotate_schema(params: &CppGeneratorParams, schema: SBSchema) -> CppSchema {
+pub(crate) fn annotate_schema(params: &CppGeneratorParams, schema: &SBSchema) -> CppSchema {
     CppSchema {
         sequences: schema
             .sequences

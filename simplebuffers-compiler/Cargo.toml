@@ -17,3 +17,5 @@ simplebuffers-sanitycheck = { path = "../simplebuffers-sanitycheck" }
 simplebuffers-cpp = { path = "../simplebuffers-cpp" }
 clap = { version = "4.5.8", features = ["derive"] }
 libloading = "0.8.4"
+convert_case = "0.6.0"
+itertools = "0.13.0"

@@ -1,15 +1,16 @@
-use std::{path::Path, process::ExitCode};
+mod ast;
+mod compiler;
+mod internal_generators;
+mod reserved_identifiers;
+mod tokenizer;
 
 use clap::Parser;
 use internal_generators::get_internal_generator;
 use libloading::{Library, Symbol};
+use reserved_identifiers::check_reserved;
 use simplebuffers_codegen::{CodeGenerator, GeneratorParams};
 use simplebuffers_core::SBSchema;
-
-mod ast;
-mod compiler;
-mod internal_generators;
-mod tokenizer;
+use std::{path::Path, process::ExitCode};
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 
@@ -44,8 +45,8 @@ struct Cli {
 
 /// Load a generator from a shared library and run it.
 fn run_from_lib(
-    schema: SBSchema,
-    params: GeneratorParams,
+    schema: &SBSchema,
+    params: &GeneratorParams,
     path: &str,
     gen_name: &str,
 ) -> Result<(), String> {
@@ -57,14 +58,18 @@ fn run_from_lib(
             .map_err(|_| format!("Failed to load generator from '{}'", path))?
     };
     let mut generator = loaded_constructor();
+    check_reserved(schema, &generator.reserved_identifiers(params))
+        .map_err(|e| format!("{}", e))?;
     generator
         .generate(schema, params)
         .map_err(|e| format!("GENERATOR ERROR: {}", e))
 }
 
 /// Search for a generator bundled with the SimpleBuffers compiler and run it if found.
-fn run_internal(schema: SBSchema, params: GeneratorParams, gen_name: &str) -> Result<(), String> {
+fn run_internal(schema: &SBSchema, params: &GeneratorParams, gen_name: &str) -> Result<(), String> {
     if let Some(mut generator) = get_internal_generator(gen_name) {
+        check_reserved(schema, &generator.reserved_identifiers(params))
+            .map_err(|e| format!("{}", e))?;
         generator
             .generate(schema, params)
             .map_err(|e| format!("GENERATOR ERROR: {}", e))
@@ -101,9 +106,9 @@ fn main_impl() -> Result<(), String> {
     };
 
     if let Some(lib_path) = cli.lib {
-        run_from_lib(schema, generator_params, &lib_path, &cli.generator)
+        run_from_lib(&schema, &generator_params, &lib_path, &cli.generator)
     } else {
-        run_internal(schema, generator_params, &cli.generator)
+        run_internal(&schema, &generator_params, &cli.generator)
     }
 }
 

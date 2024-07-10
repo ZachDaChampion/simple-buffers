@@ -18,12 +18,19 @@ impl CodeGenerator for SanityCheckCodeGenerator {
 
     fn generate(
         &mut self,
-        schema: simplebuffers_core::SBSchema,
-        _params: simplebuffers_codegen::GeneratorParams,
+        schema: &simplebuffers_core::SBSchema,
+        _params: &simplebuffers_codegen::GeneratorParams,
     ) -> Result<(), String> {
         print_enums(&schema.enums);
         print_sequences(&schema.sequences);
         Ok(())
+    }
+
+    fn reserved_identifiers(
+        &mut self,
+        _params: &simplebuffers_codegen::GeneratorParams,
+    ) -> Vec<String> {
+        vec![]
     }
 }
 
