@@ -255,11 +255,7 @@ fn annotate_type(params: &CppGeneratorParams, ty: &Type, field_name: &str) -> Cp
 /// # Returns
 ///
 /// An annotated CppOneOf.
-fn annotate_oneof(
-    params: &CppGeneratorParams,
-    subfields: &Vec<Field>,
-    field_name: &str,
-) -> CppOneOf {
+fn annotate_oneof(params: &CppGeneratorParams, subfields: &[Field], field_name: &str) -> CppOneOf {
     CppOneOf {
         name: field_name.to_case(params.class_case),
         fields: (subfields
