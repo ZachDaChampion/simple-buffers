@@ -67,7 +67,7 @@ pub trait CodeGenerator {
 ///         // Custom generation logic here...
 ///     }
 ///
-///     fn reserved_identifiers(&mut self, _params: &GeneratorParams) -> String {
+///     fn reserved_identifiers(&mut self, _params: &GeneratorParams) -> Vec<String> {
 ///         vec!["if", "for", "while"]
 ///             .iter()
 ///             .map(|s| s.to_string())
