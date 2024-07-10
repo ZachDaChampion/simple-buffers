@@ -33,7 +33,7 @@ enum CaseOption {
 #[command(name = "SimpleBuffers C++ Code Generator")]
 #[command(version = VERSION)]
 #[command(about = "Generate C++ code from a SimpleBuffers schema.")]
-struct CLI {
+struct Cli {
     /// The directory to write generated header files to. Source files will be written to `dstdir`.
     /// If `headerdir` is not specified, header files will be written to `dstdir` as well.
     #[arg(long)]
@@ -92,7 +92,7 @@ pub(crate) struct CppGeneratorParams {
 
 /// Parse generator-specific arguments from an input string.
 pub(crate) fn parse_args(generator_params: &GeneratorParams) -> CppGeneratorParams {
-    let cli = CLI::parse_from(generator_params.additional_args.split_ascii_whitespace());
+    let cli = Cli::parse_from(generator_params.additional_args.split_ascii_whitespace());
     CppGeneratorParams {
         header_dir: cli.headerdir.unwrap_or(generator_params.dest_dir.clone()),
         class_case: cli.classcase.unwrap_or(CaseOption::Pascal).into(),

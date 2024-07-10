@@ -71,6 +71,20 @@ pub(crate) struct CppOneOf {
     pub fields: Vec<CppField>,
 }
 
+impl CppEnum {
+    /// Returns the C++ type that corresponds with this enum. This is used as the base of a C++
+    /// enum class, so we prefer fast data types over minimal ones.
+    pub(crate) fn size_to_type(&self) -> &str {
+        match self.size {
+            1 => "uint_fast8_t",
+            2 => "uint_fast16_t",
+            4 => "uint_fast32_t",
+            8 => "uint_fast64_t",
+            _ => panic!("Invalid size {} for enum {}", self.size, self.name),
+        }
+    }
+}
+
 /// This trait is implemented for fields and types that must be represented in specific ways for
 /// Readers and Writers.
 pub(crate) trait ToReaderWriterString {

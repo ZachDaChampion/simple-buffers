@@ -26,7 +26,7 @@ impl CodeGenerator for CPPCodeGenerator {
         let generator_params = parse_args(params);
         println!("C++ Generator! Args: {:?}", generator_params);
 
-        let annotated = annotate_schema(&generator_params, &schema);
+        let annotated = annotate_schema(&generator_params, schema);
         println!("\n\nAnnotated:\n\n{:?}", annotated);
 
         let header = generate_header(&generator_params, &annotated);
