@@ -7,6 +7,10 @@ enum RobotJoint {
     j5 = 5;
 }
 
+enum BigBoy {
+    only_option = 999999;
+}
+
 sequence Request {
     id: u32;
     payload: oneof {
@@ -15,6 +19,7 @@ sequence Request {
         testOneOf: oneof {
             moveToEntry: MoveToEntry;
             stringTest: StringTest;
+            bigBoy: BigBoy;
         };
     };
 }

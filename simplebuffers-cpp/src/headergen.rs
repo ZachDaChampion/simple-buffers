@@ -8,7 +8,6 @@ use crate::annotate::CppEnum;
 use crate::annotate::CppOneOf;
 use crate::annotate::CppSchema;
 use crate::annotate::CppSequence;
-use crate::annotate::CppType;
 use crate::annotate::ToReaderWriterString;
 use crate::argparse::CppGeneratorParams;
 
@@ -105,6 +104,7 @@ fn define_enum(_params: &CppGeneratorParams, data: &CppEnum) -> String {
         enum class {name} : {dtype} {{
             {variants}
         }};",
+        variants = indent_by(4, variants)
     }
 }
 
@@ -133,12 +133,8 @@ fn define_sequence_writer(params: &CppGeneratorParams, seq: &CppSequence) -> Str
         // Generate class definitions of any oneof fields contained in the sequence. These are
         // subclasses of this sequence class.
         let oneofs = seq
-            .fields
-            .iter()
-            .filter_map(|f| match &f.ty {
-                CppType::OneOf(o) => Some(define_oneof_writer(params, o)),
-                _ => None,
-            })
+            .oneofs()
+            .map(|o| define_oneof_writer(params, o))
             .join("\n\n");
 
         // Generate member declarations for all fields.
@@ -166,8 +162,8 @@ fn define_sequence_writer(params: &CppGeneratorParams, seq: &CppSequence) -> Str
     // Generate full class code.
     formatdoc! {
         r"
-        class {class_name} : public SimpleBufferWriter {{
-            public:
+        class {class_name} : public simplebuffers::SimpleBufferWriter {{
+           public:
             {body}
         }};",
         body = indent_by(4, body.trim())
@@ -188,19 +184,15 @@ fn define_oneof_writer(params: &CppGeneratorParams, oneof: &CppOneOf) -> String 
         // Generate class definitions of any oneof fields. These are subclasses of this oneof class
         // and are generated recursively.
         let oneofs = oneof
-            .fields
-            .iter()
-            .filter_map(|f| match &f.ty {
-                CppType::OneOf(o) => Some(define_oneof_writer(params, o)),
-                _ => None,
-            })
+            .oneofs()
+            .map(|o| define_oneof_writer(params, o))
             .join("\n\n");
 
         // Generate a list of tags for the fields. These are members of the `Tag` enum class.
         let tags = oneof
             .fields
             .iter()
-            .map(|f| format!("{} = {}", f.name.to_case(params.enum_var_case), f.index))
+            .map(|f| format!("{} = {}", f.tag, f.index))
             .join(",\n");
 
         // Generate a list of possible values for each oneof field. These are held in a union and
@@ -221,7 +213,7 @@ fn define_oneof_writer(params: &CppGeneratorParams, oneof: &CppOneOf) -> String 
                 format!(
                     "static {} {}({}* val);",
                     class_name,
-                    f.name.to_case(params.class_case),
+                    f.constructor,
                     f.ty.to_writer_string(params)
                 )
             })
@@ -244,7 +236,6 @@ fn define_oneof_writer(params: &CppGeneratorParams, oneof: &CppOneOf) -> String 
 
             uint8_t* write_component(uint8_t* dest, const uint8_t* dest_end,
                                      uint8_t* dyn_cursor) const override;",
-            oneofs = indent_by(4, oneofs),
             tags = indent_by(4, tags),
             values = indent_by(4, values)
         }
@@ -253,11 +244,11 @@ fn define_oneof_writer(params: &CppGeneratorParams, oneof: &CppOneOf) -> String 
     // Generate full class code.
     formatdoc! {
         r"
-        class {class_name} : public OneOfWriter {{
-            public:
+        class {class_name} : public simplebuffers::OneOfWriter {{
+           public:
             {public_body}
 
-            private:
+           private:
             {class_name}(Tag tag, Value value);
         
             Tag tag;

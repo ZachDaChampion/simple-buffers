@@ -82,6 +82,13 @@ pub fn parse_ast<'a>(root: &'a TaggedSyntaxTree<'a>) -> Result<SBSchema, Box<Com
         }
     }
 
+    // Inject enum size into all enum types.
+    for enm in &result.enums {
+        for sequence in &mut result.sequences {
+            inject_enum_size_into(&enm.name, enm.size.into(), &mut sequence.fields);
+        }
+    }
+
     Ok(result)
 }
 
@@ -165,7 +172,7 @@ fn parse_type<'a>(
             else if let Some(struct_type) = struct_map.get(name) {
                 match struct_type {
                     StructType::Sequence => Ok(Type::Sequence(name.clone())),
-                    StructType::Enum => Ok(Type::Enum(name.clone())),
+                    StructType::Enum => Ok(Type::Enum(name.clone(), 0)),
                 }
             }
             // Type is not a string, sequence, or enum. Check if it is a primitive.
@@ -311,4 +318,19 @@ fn parse_enum<'a>(
         size: enum_size,
         variants,
     })
+}
+
+/// Finds any enum fields that match the given name and injects the given size into them.
+fn inject_enum_size_into(enum_name: &str, enum_size: usize, fields: &mut [Field]) {
+    for field in fields {
+        match &mut field.ty {
+            Type::Enum(found_name, found_size) => {
+                if found_name == enum_name {
+                    *found_size = enum_size;
+                }
+            }
+            Type::OneOf(subfields) => inject_enum_size_into(enum_name, enum_size, subfields),
+            _ => {}
+        }
+    }
 }

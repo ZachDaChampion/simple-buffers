@@ -34,20 +34,38 @@ pub(crate) struct CppSequence {
     pub name: String,
 
     /// The fields of the sequence.
-    pub fields: Vec<CppField>,
+    pub fields: Vec<CppSequenceField>,
+
+    /// The size of the sequence in bytes.
+    pub size: usize,
 }
 
 /// A field, annotated and adjusted for C++ conventions.
 #[derive(Debug)]
-pub(crate) struct CppField {
+pub(crate) struct CppSequenceField {
     /// The name of the field.
     pub name: String,
 
     /// The type of the field.
     pub ty: CppType,
+}
 
-    /// The index of the field. For sequences, this is the offset in bytes from the start of the
-    /// sequence. For oneofs, this is the index of the field in the oneof.
+/// A field, annotated and adjusted for C++ conventions.
+#[derive(Debug)]
+pub(crate) struct CppOneOfField {
+    /// The name of the field.
+    pub name: String,
+
+    // The tag of the field, used as an enum variant.
+    pub tag: String,
+
+    // The name of the field's dedicated constructor.
+    pub constructor: String,
+
+    /// The type of the field.
+    pub ty: CppType,
+
+    /// The index of the field in the oneof.
     pub index: usize,
 }
 
@@ -56,7 +74,7 @@ pub(crate) struct CppField {
 pub(crate) enum CppType {
     Primitive(&'static str),
     Sequence(String),
-    Enum(String),
+    Enum(String, usize),
     Array(Box<CppType>),
     OneOf(CppOneOf),
 }
@@ -68,7 +86,7 @@ pub(crate) struct CppOneOf {
     pub name: String,
 
     /// The fields of the oneof.
-    pub fields: Vec<CppField>,
+    pub fields: Vec<CppOneOfField>,
 }
 
 impl CppEnum {
@@ -81,6 +99,68 @@ impl CppEnum {
             4 => "uint_fast32_t",
             8 => "uint_fast64_t",
             _ => panic!("Invalid size {} for enum {}", self.size, self.name),
+        }
+    }
+}
+
+impl CppSequence {
+    /// Return an iterator over all of the oneof fields contained within this sequence.
+    pub(crate) fn oneofs(&self) -> impl DoubleEndedIterator<Item = &CppOneOf> {
+        self.fields.iter().filter_map(|f| match &f.ty {
+            CppType::OneOf(o) => Some(o),
+            _ => None,
+        })
+    }
+}
+
+impl CppSequenceField {
+    /// Returns a version of this field's name, cast to the appropriate type for serialization. This
+    /// only affects enums.
+    pub(crate) fn cast(&self) -> String {
+        match self.ty {
+            CppType::Enum(_, size) => format!(
+                "static_cast<{}>({})",
+                match size {
+                    1 => "uint8_t",
+                    2 => "uint16_t",
+                    4 => "uint32_t",
+                    8 => "uint64_t",
+                    _ => panic!("Invalid size {} for enum {}", size, self.name),
+                },
+                self.name
+            ),
+            _ => self.name.to_string(),
+        }
+    }
+}
+
+impl CppOneOf {
+    /// Return an iterator over all of the oneof fields contained within this oneof.
+    pub(crate) fn oneofs(&self) -> impl DoubleEndedIterator<Item = &CppOneOf> {
+        self.fields.iter().filter_map(|f| match &f.ty {
+            CppType::OneOf(o) => Some(o),
+            _ => None,
+        })
+    }
+}
+
+impl CppOneOfField {
+    /// Returns a version of this field's name, cast to the appropriate type for serialization. This
+    /// only affects enums.
+    pub(crate) fn cast(&self) -> String {
+        match self.ty {
+            CppType::Enum(_, size) => format!(
+                "static_cast<{}>({})",
+                match size {
+                    1 => "uint8_t",
+                    2 => "uint16_t",
+                    4 => "uint32_t",
+                    8 => "uint64_t",
+                    _ => panic!("Invalid size {} for enum {}", size, self.name),
+                },
+                self.name
+            ),
+            _ => self.name.to_string(),
         }
     }
 }
@@ -100,8 +180,10 @@ impl ToReaderWriterString for CppType {
         match self {
             CppType::Primitive(p) => p.to_string(),
             CppType::Sequence(s) => format!("{}_Writer", s).to_case(params.class_case),
-            CppType::Enum(e) => e.clone(),
-            CppType::Array(t) => format!("ArrayWriter<{}>", t.to_writer_string(params)),
+            CppType::Enum(e, _) => e.clone(),
+            CppType::Array(t) => {
+                format!("simplebuffers::ArrayWriter<{}>", t.to_writer_string(params))
+            }
             CppType::OneOf(o) => format!("{}_Writer", o.name).to_case(params.class_case),
         }
     }
@@ -110,8 +192,10 @@ impl ToReaderWriterString for CppType {
         match self {
             CppType::Primitive(p) => p.to_string(),
             CppType::Sequence(s) => format!("{}_Reader", s).to_case(params.class_case),
-            CppType::Enum(e) => e.clone(),
-            CppType::Array(t) => format!("ArrayReader<{}>", t.to_writer_string(params)),
+            CppType::Enum(e, _) => e.clone(),
+            CppType::Array(t) => {
+                format!("simplebuffers::ArrayReader<{}>", t.to_writer_string(params))
+            }
             CppType::OneOf(o) => format!("{}_Reader", o.name).to_case(params.class_case),
         }
     }
@@ -190,25 +274,12 @@ fn annotate_sequence(params: &CppGeneratorParams, seq: &Sequence) -> CppSequence
         fields: seq
             .fields
             .iter()
-            .map(|f| annotate_field(params, f))
+            .map(|f| CppSequenceField {
+                name: f.name.to_case(params.field_case),
+                ty: annotate_type(params, &f.ty, f.name.as_str()),
+            })
             .collect(),
-    }
-}
-
-/// Annotates a single field.
-///
-/// # Arguments
-///
-/// * `field` - The field to annotate.
-///
-/// # Returns
-///
-/// An annotated CppField.
-fn annotate_field(params: &CppGeneratorParams, field: &Field) -> CppField {
-    CppField {
-        name: field.name.to_case(params.field_case),
-        ty: annotate_type(params, &field.ty, field.name.as_str()),
-        index: field.index,
+        size: seq.fields.iter().fold(0, |acc, f| acc + f.ty.size()),
     }
 }
 
@@ -238,7 +309,7 @@ fn annotate_type(params: &CppGeneratorParams, ty: &Type, field_name: &str) -> Cp
             Primitive::F64 => "double",
         }),
         Type::Sequence(s) => CppType::Sequence(s.to_case(params.class_case)),
-        Type::Enum(e) => CppType::Enum(e.to_case(params.class_case)),
+        Type::Enum(e, s) => CppType::Enum(e.to_case(params.class_case), *s),
         Type::Array(t) => CppType::Array(Box::new(annotate_type(params, t, field_name))),
         Type::String => CppType::Primitive("char*"),
         Type::OneOf(o) => CppType::OneOf(annotate_oneof(params, o, field_name)),
@@ -260,8 +331,10 @@ fn annotate_oneof(params: &CppGeneratorParams, subfields: &[Field], field_name: 
         name: field_name.to_case(params.class_case),
         fields: (subfields
             .iter()
-            .map(|f| CppField {
+            .map(|f| CppOneOfField {
                 name: f.name.to_case(params.field_case),
+                tag: f.name.to_case(params.enum_var_case),
+                constructor: f.name.to_case(params.class_case),
                 ty: annotate_type(params, &f.ty, f.name.as_str()),
                 index: f.index,
             })

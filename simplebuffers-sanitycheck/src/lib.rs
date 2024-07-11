@@ -96,7 +96,7 @@ fn print_sequences(sequences: &[Sequence]) {
                 match &field_type {
                     Type::Primitive(name) => println!("{} (primitive)", name),
                     Type::Sequence(name) => println!("{} (sequence)", name),
-                    Type::Enum(name) => println!("{} (enum)", name),
+                    Type::Enum(name, size) => println!("{} (enum, {} bytes)", name, size),
                     Type::Array(ty) => {
                         print!("ARRAY OF ");
                         stack.push((None, ty, 0));

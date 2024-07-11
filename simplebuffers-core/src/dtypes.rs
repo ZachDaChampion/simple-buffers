@@ -85,8 +85,8 @@ pub enum Type {
     /// A sequence type.
     Sequence(String),
 
-    /// An enum type.
-    Enum(String),
+    /// An enum type. This contains its name and its size when stored.
+    Enum(String, usize),
 
     /// An array type.
     Array(Box<Type>),
@@ -105,11 +105,11 @@ impl Type {
     pub fn size(&self) -> usize {
         match self {
             Self::Primitive(p) => p.size(),
-            Self::Sequence(_) => 2, // 16-bit offset to actual sequence
-            Self::Enum(_) => 1,     // 8-bit enum value
-            Self::Array(_) => 4,    // 16-bit array length + 16-bit offset to actual array
-            Self::String => 2,      // 16-bit offset
-            Self::OneOf(_) => 3,    // 8-bit index + 16-bit offset to actual field
+            Self::Sequence(_) => 2, // 16-bit offset to actual sequence.
+            Self::Enum(_, s) => *s, // Size depends on enum values.
+            Self::Array(_) => 4,    // 16-bit array length + 16-bit offset to actual array.
+            Self::String => 2,      // 16-bit offset.
+            Self::OneOf(_) => 3,    // 8-bit index + 16-bit offset to actual field.
         }
     }
 }

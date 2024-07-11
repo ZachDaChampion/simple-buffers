@@ -1,11 +1,13 @@
 mod annotate;
 mod argparse;
 mod headergen;
+mod sourcegen;
 
 use annotate::annotate_schema;
 use argparse::parse_args;
 use headergen::generate_header;
 use simplebuffers_codegen::CodeGenerator;
+use sourcegen::generate_source;
 
 #[derive(Debug)]
 pub struct CPPCodeGenerator;
@@ -32,6 +34,9 @@ impl CodeGenerator for CPPCodeGenerator {
         let header = generate_header(&generator_params, &annotated);
         println!("\n\nHeader:\n\n{}", header);
 
+        let source = generate_source(&generator_params, &annotated);
+        println!("\n\nSource:\n\n{}", source);
+
         Ok(())
     }
 
@@ -40,6 +45,8 @@ impl CodeGenerator for CPPCodeGenerator {
         _params: &simplebuffers_codegen::GeneratorParams,
     ) -> Vec<String> {
         vec![
+            "__sb",
+            "__sbs",
             "alignas",
             "alignof",
             "and",
