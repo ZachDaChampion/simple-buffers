@@ -400,7 +400,7 @@ uint8_t* write_oneof_field(uint8_t* dest, const uint8_t* dest_end, uint8_t* dyn_
     dest[2] = offset & 0xFF;
 
     return write_field(dyn_cursor, dest_end, dyn_cursor + static_size, val);
-}
+};
 
 //                                                                                                //
 // ===================================== SimpleBufferReader ===================================== //

@@ -3,6 +3,8 @@ mod argparse;
 mod headergen;
 mod sourcegen;
 
+use std::{fs::File, io::Write};
+
 use annotate::annotate_schema;
 use argparse::parse_args;
 use headergen::generate_header;
@@ -36,6 +38,28 @@ impl CodeGenerator for CPPCodeGenerator {
 
         let source = generate_source(&generator_params, &annotated);
         println!("\n\nSource:\n\n{}", source);
+
+        {
+            let mut header_file = File::create(format!(
+                "{}/{}.hpp",
+                generator_params.header_dir, generator_params.global.file_name
+            ))
+            .expect("Failed to open header file");
+            header_file
+                .write_all(header.as_bytes())
+                .expect("Failed to write header file.");
+        }
+
+        {
+            let mut source_file = File::create(format!(
+                "{}/{}.cpp",
+                generator_params.global.dest_dir, generator_params.global.file_name
+            ))
+            .expect("Failed to open header file");
+            source_file
+                .write_all(source.as_bytes())
+                .expect("Failed to write header file.");
+        }
 
         Ok(())
     }

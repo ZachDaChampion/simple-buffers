@@ -129,14 +129,59 @@ class MoveToEntryWriter : public simplebuffers::SimpleBufferWriter {
 
 class StringTestWriter : public simplebuffers::SimpleBufferWriter {
    public:
-    StringTestWriter(char* test, int64_t string);
+    StringTestWriter(const char* test, int64_t string);
 
-    char* test;
+    const char* test;
     int64_t string;
 
     uint16_t static_size() const override;
     uint8_t* write_component(uint8_t* dest, const uint8_t* dest_end,
                              uint8_t* dyn_cursor) const override;
+};
+
+class RequestReader;
+class InitReader;
+class MoveToReader;
+class MoveToEntryReader;
+class StringTestReader;
+
+class RequestReader : public simplebuffers::SimpleBufferReader {
+   public:
+    uint32_t id() const;
+    PayloadReader payload() const;
+    
+    uint16_t static_size() const override;
+};
+
+class InitReader : public simplebuffers::SimpleBufferReader {
+   public:
+    uint32_t expected_firmware() const;
+    
+    uint16_t static_size() const override;
+};
+
+class MoveToReader : public simplebuffers::SimpleBufferReader {
+   public:
+    simplebuffers::ArrayReader<MoveToEntryWriter> joints() const;
+    
+    uint16_t static_size() const override;
+};
+
+class MoveToEntryReader : public simplebuffers::SimpleBufferReader {
+   public:
+    RobotJoint joint() const;
+    float angle() const;
+    float speed() const;
+    
+    uint16_t static_size() const override;
+};
+
+class StringTestReader : public simplebuffers::SimpleBufferReader {
+   public:
+    const char* test() const;
+    int64_t string() const;
+    
+    uint16_t static_size() const override;
 };
 
 } // namespace simplebuffers_test

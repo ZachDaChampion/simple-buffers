@@ -101,7 +101,7 @@ fn main_impl() -> Result<(), String> {
 
     let generator_params = GeneratorParams {
         file_name: filename,
-        dest_dir: cli.dstdir.unwrap_or("".to_string()),
+        dest_dir: cli.dstdir.unwrap_or("./".to_string()),
         additional_args: generator_args,
     };
 

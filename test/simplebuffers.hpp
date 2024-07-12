@@ -104,13 +104,15 @@ class ArrayWriter : public SimpleBufferWriter {
      */
     ArrayWriter(T* const val, uint16_t len) : val_(val), len_(len) {}
 
-    uint16_t static_size() const override { return 2; }
+    uint16_t static_size() const override { return 4; }
 
     uint8_t* write_component(uint8_t* dest, const uint8_t* dest_end,
                              uint8_t* dyn_cursor = nullptr) const {
         uint16_t offset = dyn_cursor - dest;
-        dest[0] = offset >> 8;
-        dest[1] = offset & 0xFF;
+        dest[0] = len_ >> 8;
+        dest[1] = len_ & 0xFF;
+        dest[2] = offset >> 8;
+        dest[3] = offset & 0xFF;
 
         return write_data_(dyn_cursor, dest_end, val_, len_);
     }
@@ -137,11 +139,6 @@ class ArrayWriter : public SimpleBufferWriter {
         // Create a pointer to the end of the static array data. This is where the dynamic data of
         // the elements will be written.
         uint8_t* dyn_cursor = dest + total_static_size;
-
-        // Write the array length to the buffer.
-        dest[0] = len >> 8;
-        dest[1] = len & 0xFF;
-        dest += 2;
 
         // Write each element to the buffer.
         for (uint16_t i = 0; i < len; ++i) {
@@ -174,11 +171,6 @@ uint8_t* ArrayWriter<uint8_t>::write_data_(uint8_t* dest, const uint8_t* dest_en
     uint16_t total_static_size = 2 + len;  // 2 bytes for the array length
     if (dest + total_static_size > dest_end) return nullptr;
 
-    // Write the array length to the buffer.
-    dest[0] = len >> 8;
-    dest[1] = len & 0xFF;
-    dest += 2;
-
     memcpy(dest, val, len);
     return dest + total_static_size;
 }
@@ -197,11 +189,6 @@ uint8_t* ArrayWriter<int8_t>::write_data_(uint8_t* dest, const uint8_t* dest_end
                                           uint16_t len) {
     uint16_t total_static_size = 2 + len;  // 2 bytes for the array length
     if (dest + total_static_size > dest_end) return nullptr;
-
-    // Write the array length to the buffer.
-    dest[0] = len >> 8;
-    dest[1] = len & 0xFF;
-    dest += 2;
 
     memcpy(dest, val, len);
     return dest + total_static_size;
@@ -363,7 +350,7 @@ uint8_t* write_field(uint8_t* dest, const uint8_t* dest_end, uint8_t* dyn_cursor
 }
 
 uint8_t* write_field(uint8_t* dest, const uint8_t* dest_end, uint8_t* dyn_cursor, const bool& val) {
-    dest[0] = val;
+    dest[0] = val ? 1 : 0;
     return dyn_cursor;
 }
 
@@ -413,6 +400,343 @@ uint8_t* write_oneof_field(uint8_t* dest, const uint8_t* dest_end, uint8_t* dyn_
     dest[2] = offset & 0xFF;
 
     return write_field(dyn_cursor, dest_end, dyn_cursor + static_size, val);
+};
+
+//                                                                                                //
+// ===================================== SimpleBufferReader ===================================== //
+//                                                                                                //
+
+class SimpleBufferReader {
+   public:
+    /**
+     * Construct a new Reader object.
+     *
+     * @param[in] data_ptr A pointer to this component's location in a data buffer.
+     * @param[in] data_len The length of the data buffer (measured from `data_ptr` to end).
+     */
+    SimpleBufferReader(uint8_t* data_ptr, size_t data_len = 0)
+        : data_ptr_(data_ptr), data_len_(data_len) {}
+
+    /**
+     * @brief Returns a pointer to this component in the data buffer.
+     *
+     * @return Pointer to the component in the data buffer.
+     */
+    const uint8_t* data() const { return data_ptr_; }
+
+    /**
+     * @brief Returns the static size of the object.
+     *
+     * The number returned by this function represents the size of all statically-sized fields in
+     * a component. Dynamically-sized fields are not included in this number, but relative offsets
+     * are. These offsets are used to determine the location of dynamically-sized fields in the
+     * buffer.
+     *
+     * @return The static size of the object.
+     */
+    virtual uint16_t static_size() const = 0;
+
+   protected:
+    const uint8_t* data_ptr_;
+    size_t data_len_;
+};
+
+//                                                                                                //
+// ======================================== ArrayReader ========================================= //
+//                                                                                                //
+/**
+ * @brief A class for reading arrays from a simple buffer.
+ *
+ * @tparam T The type of the array elements.
+ */
+template <typename T>
+class ArrayReader : public SimpleBufferReader {
+   public:
+    /**
+     * Construct a new Reader object.
+     *
+     * @param[in] data_ptr A pointer to this component's location in a data buffer.
+     * @param[in] data_len The length of the data buffer (measured from `data_ptr` to end).
+     */
+    ArrayReader(uint8_t* data_ptr, size_t data_len = 0) : SimpleBufferReader(data_ptr, data_len) {
+        data_end_ = data_ptr + data_len;
+        if (data_ptr + static_size() >= data_len) {
+            array_len_ = read_u16(data_ptr);
+            array_content_ = data_ptr + read_u16(data_ptr + 2);
+        } else {
+            array_len_ = 0;
+            array_content_ = nullptr;
+        }
+    }
+
+    /**
+     * Get the number of elements in the array.
+     *
+     * @return The length of the array.
+     */
+    uint16_t len() const { return array_len_; }
+
+    /**
+     * Read the value at index `idx` from the array.
+     *
+     * This function does not check bounds and has undefined behavior if an out-of-bounds index is
+     * given.
+     *
+     * @param[in] idx The index to read.
+     * @return The value read from the array.
+     */
+    T read(uint16_t idx) const {
+        return T(array_content_, static_cast<uint16_t>(data_end_ - array_content_));
+    }
+
+    /**
+     * Read the value at index `idx` from the array.
+     *
+     * This function does not check bounds and has undefined behavior if an out-of-bounds index is
+     * given.
+     *
+     * @param[in] idx The index to read.
+     * @return The value read from the array.
+     */
+    T operator[](uint16_t idx) const { return read(idx); }
+
+    /**
+     * @brief Returns the static size of the object.
+     *
+     * The number returned by this function represents the size of all statically-sized fields in
+     * a component. Dynamically-sized fields are not included in this number, but relative offsets
+     * are. These offsets are used to determine the location of dynamically-sized fields in the
+     * buffer.
+     *
+     * @return The static size of the object.
+     */
+    uint16_t static_size() const override { return 4; }
+
+   protected:
+    uint16_t array_len_;
+    const uint8_t* array_content_;
+    const uint8_t* data_end_;
+};
+
+template <>
+uint8_t ArrayReader<uint8_t>::read(uint16_t idx) const {
+    return read_u8(array_content_ + idx);
+}
+
+template <>
+int8_t ArrayReader<int8_t>::read(uint16_t idx) const {
+    return read_i8(array_content_ + idx);
+}
+
+template <>
+uint16_t ArrayReader<uint16_t>::read(uint16_t idx) const {
+    return read_u16(array_content_ + idx);
+}
+
+template <>
+int16_t ArrayReader<int16_t>::read(uint16_t idx) const {
+    return read_i16(array_content_ + idx);
+}
+
+template <>
+uint32_t ArrayReader<uint32_t>::read(uint16_t idx) const {
+    return read_u32(array_content_ + idx);
+}
+
+template <>
+int32_t ArrayReader<int32_t>::read(uint16_t idx) const {
+    return read_i32(array_content_ + idx);
+}
+
+template <>
+uint64_t ArrayReader<uint64_t>::read(uint16_t idx) const {
+    return read_u64(array_content_ + idx);
+}
+
+template <>
+int64_t ArrayReader<int64_t>::read(uint16_t idx) const {
+    return read_i64(array_content_ + idx);
+}
+
+template <>
+float ArrayReader<float>::read(uint16_t idx) const {
+    return read_f32(array_content_ + idx);
+}
+
+template <>
+double ArrayReader<double>::read(uint16_t idx) const {
+    return read_f64(array_content_ + idx);
+}
+
+template <>
+bool ArrayReader<bool>::read(uint16_t idx) const {
+    return read_bool(array_content_ + idx);
+}
+
+template <>
+const char* ArrayReader<const char*>::read(uint16_t idx) const {
+    const uint8_t* const static_ptr = array_content_ + idx;
+    const uint16_t offset = read_u16(static_ptr);
+    return reinterpret_cast<const char*>(static_ptr + offset);
+}
+
+//                                                                                                //
+// ========================================= Read field ========================================= //
+//                                                                                                //
+
+/**
+ * @brief Reads a u8 field from a buffer.
+ *
+ * @param src The destination to read static data from.
+ */
+uint8_t read_u8(const uint8_t* src) { return *src; }
+
+/**
+ * @brief Reads an i8 field from a buffer.
+ *
+ * @param src The destination to read static data from.
+ */
+int8_t read_i8(const uint8_t* src) { return *src; }
+
+/**
+ * @brief Reads a u16 field from a buffer.
+ *
+ * @param src The destination to read static data from.
+ */
+uint16_t read_u16(const uint8_t* src) {
+    uint16_t val = 0;
+    val |= src[0] << 0;
+    val |= src[1] << 8;
+    return val;
+}
+
+/**
+ * @brief Reads an i16 field from a buffer.
+ *
+ * @param src The destination to read static data from.
+ */
+int16_t read_i16(const uint8_t* src) {
+    int16_t val = 0;
+    val |= src[0] << 0;
+    val |= src[1] << 8;
+    return val;
+}
+
+/**
+ * @brief Reads a u32 field from a buffer.
+ *
+ * @param src The destination to read static data from.
+ */
+uint32_t read_u32(const uint8_t* src) {
+    uint32_t val = 0;
+    val |= src[0] << 0;
+    val |= src[1] << 8;
+    val |= src[2] << 16;
+    val |= src[3] << 24;
+    return val;
+}
+
+/**
+ * @brief Reads an i32 field from a buffer.
+ *
+ * @param src The destination to read static data from.
+ */
+int32_t read_i32(const uint8_t* src) {
+    int32_t val = 0;
+    val |= src[0] << 0;
+    val |= src[1] << 8;
+    val |= src[2] << 16;
+    val |= src[3] << 24;
+    return val;
+}
+
+/**
+ * @brief Reads a u64 field from a buffer.
+ *
+ * @param src The destination to read static data from.
+ */
+uint64_t read_u64(const uint8_t* src) {
+    uint64_t val = 0;
+    val |= src[0] << 0;
+    val |= src[1] << 8;
+    val |= src[2] << 16;
+    val |= src[3] << 24;
+    val |= src[0] << 32;
+    val |= src[1] << 40;
+    val |= src[2] << 48;
+    val |= src[3] << 56;
+    return val;
+}
+
+/**
+ * @brief Reads an i64 field from a buffer.
+ *
+ * @param src The destination to read static data from.
+ */
+int64_t read_i64(const uint8_t* src) {
+    int64_t val = 0;
+    val |= src[0] << 0;
+    val |= src[1] << 8;
+    val |= src[2] << 16;
+    val |= src[3] << 24;
+    val |= src[0] << 32;
+    val |= src[1] << 40;
+    val |= src[2] << 48;
+    val |= src[3] << 56;
+    return val;
+}
+
+/**
+ * @brief Reads an f32 field from a buffer.
+ *
+ * @param src The destination to read static data from.
+ */
+float read_f32(const uint8_t* src) {
+    uint32_t val_int;
+    float val;
+    val_int |= src[0] << 0;
+    val_int |= src[1] << 8;
+    val_int |= src[2] << 16;
+    val_int |= src[3] << 24;
+    memcpy(&val, &val_int, sizeof(float));
+    return val;
+}
+
+/**
+ * @brief Reads an f64 field from a buffer.
+ *
+ * @param src The destination to read static data from.
+ */
+double read_f64(const uint8_t* src) {
+    uint64_t val_int;
+    double val;
+    val_int |= src[0] << 0;
+    val_int |= src[1] << 8;
+    val_int |= src[2] << 16;
+    val_int |= src[3] << 24;
+    val_int |= src[0] << 32;
+    val_int |= src[1] << 40;
+    val_int |= src[2] << 48;
+    val_int |= src[3] << 56;
+    memcpy(&val, &val_int, sizeof(double));
+    return val;
+}
+
+/**
+ * @brief Reads a bool field from a buffer.
+ *
+ * @param src The destination to read static data from.
+ */
+bool read_bool(const uint8_t* src) { return *src ? true : false; }
+
+/**
+ * @brief Reads a string field from a buffer.
+ *
+ * @param src The destination to read data from.
+ */
+const char* read_string(const uint8_t* src) {
+    const uint16_t offset = read_u16(src);
+    return reinterpret_cast<const char*>(src + offset);
 }
 
 }  // namespace simplebuffers

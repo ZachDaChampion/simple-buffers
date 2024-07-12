@@ -76,7 +76,7 @@ RequestWriter::PayloadWriter::TestOneOfWriter RequestWriter::PayloadWriter::Test
     return TestOneOfWriter(Tag::STRING_TEST, v);
 }
 
-RequestWriter::PayloadWriter::TestOneOfWriter RequestWriter::PayloadWriter::TestOneOfWriter::big_boy(BigBoy* val) {     
+RequestWriter::PayloadWriter::TestOneOfWriter RequestWriter::PayloadWriter::TestOneOfWriter::big_boy(BigBoy* val) {
     Value v;
     v.big_boy = val;
     return TestOneOfWriter(Tag::BIG_BOY, v);
@@ -96,7 +96,7 @@ uint8_t* RequestWriter::PayloadWriter::TestOneOfWriter::write_component(uint8_t*
     }
 }
 
-RequestWriter::PayloadWriter::TestOneOfWriter::TestOneOfWriter(Tag tag, Value value) : tag(tag), value(value) {}        
+RequestWriter::PayloadWriter::TestOneOfWriter::TestOneOfWriter(Tag tag, Value value) : tag(tag), value(value) {}
 
 /*
  * InitWriter
@@ -159,7 +159,7 @@ uint8_t* MoveToEntryWriter::write_component(uint8_t* dest, const uint8_t* dest_e
  * StringTestWriter
  */
 
-StringTestWriter::StringTestWriter(char* test, int64_t string):
+StringTestWriter::StringTestWriter(const char* test, int64_t string):
     test(test), string(string) {}
 
 uint16_t StringTestWriter::static_size() const { return 10; }

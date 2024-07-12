@@ -291,7 +291,7 @@ fn annotate_type(params: &CppGeneratorParams, ty: &Type, field_name: &str) -> Cp
         Type::Sequence(s) => CppType::Sequence(s.to_case(Case::Pascal)),
         Type::Enum(e, s) => CppType::Enum(e.to_case(Case::Pascal), *s),
         Type::Array(t) => CppType::Array(Box::new(annotate_type(params, t, field_name))),
-        Type::String => CppType::Primitive("char*"),
+        Type::String => CppType::Primitive("const char*"),
         Type::OneOf(o) => CppType::OneOf(annotate_oneof(params, o, field_name)),
     }
 }

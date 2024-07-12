@@ -49,6 +49,20 @@ pub(crate) fn generate_header(params: &CppGeneratorParams, schema: &CppSchema) -
         .map(define_sequence_writer)
         .join("\n\n");
 
+    // Generate forward declarations for sequence readers.
+    let reader_forward_declarations = schema
+        .sequences
+        .iter()
+        .map(forward_declare_sequence_reader)
+        .join("\n");
+
+    // Generate full descriptions for sequence readers.
+    let sequence_reader_definitions = schema
+        .sequences
+        .iter()
+        .map(define_sequence_reader)
+        .join("\n\n");
+
     // Generate the full header file.
     formatdoc! {
         r#"
@@ -64,6 +78,10 @@ pub(crate) fn generate_header(params: &CppGeneratorParams, schema: &CppSchema) -
         {writer_forward_declarations}
 
         {sequence_writer_definitions}
+        
+        {reader_forward_declarations}
+
+        {sequence_reader_definitions}
 
         }} // namespace {namespace}
 
@@ -109,8 +127,7 @@ fn forward_declare_sequence_writer(seq: &CppSequence) -> String {
 
 /// Generates the C++ code for defining a sequence writer.
 fn define_sequence_writer(seq: &CppSequence) -> String {
-    // The full name of the sequence writer class, in the form "SequenceWriter" (formatted for
-    // casing preference).
+    // The full name of the sequence writer class, in the form "SequenceWriter".
     let class_name = seq.to_writer_string();
 
     // Generate class body. We do this separately from the final class generation so that we can
@@ -164,8 +181,7 @@ fn define_sequence_writer(seq: &CppSequence) -> String {
 /// sequence writer. Because oneofs can contain other oneofs as fields, we must recursively define
 /// any oneof writers we find.
 fn define_oneof_writer(oneof: &CppOneOf) -> String {
-    // The full name of the oneof writer class, in the form "OneOfWriter" (formatted for casing
-    // preference).
+    // The full name of the oneof writer class, in the form "OneOfWriter".
     let class_name = oneof.to_writer_string();
 
     // Generate the public portion of the body. This is done separately so that we can trim it and
@@ -242,5 +258,42 @@ fn define_oneof_writer(oneof: &CppOneOf) -> String {
             Value value;
         }};",
         public_body = indent_by(4, public_body.trim()),
+    }
+}
+
+/// Generates the C++ code for forward declaring sequence readers.
+fn forward_declare_sequence_reader(seq: &CppSequence) -> String {
+    let case_corrected_name = seq.to_reader_string();
+    format!("class {case_corrected_name};")
+}
+
+/// Generates the C++ code for defining sequence readers.
+fn define_sequence_reader(seq: &CppSequence) -> String {
+    // The full name of the sequence writer class, in the form "SequenceReader".
+    let class_name = seq.to_reader_string();
+
+    // Generate code to declare accessor functions for each field.
+    let fields = seq
+        .fields
+        .iter()
+        .map(|f| {
+            format!(
+                "{ty} {name}() const;",
+                ty = f.ty.to_reader_string(),
+                name = f.name
+            )
+        })
+        .join("\n");
+
+    // Generate full class code.
+    formatdoc! {
+        r"
+        class {class_name} : public simplebuffers::SimpleBufferReader {{
+           public:
+            {fields}
+            
+            uint16_t static_size() const override;
+        }};",
+        fields = indent_by(4, fields.trim())
     }
 }
