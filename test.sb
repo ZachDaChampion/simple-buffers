@@ -39,6 +39,8 @@ sequence MoveToEntry {
 }
 
 sequence StringTest {
-    test: string;
-    string: i64;
+    fields: oneof {
+        test: string;
+        string: i64;
+    };
 }

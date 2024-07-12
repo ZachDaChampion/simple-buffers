@@ -49,7 +49,7 @@ class RequestWriter : public simplebuffers::SimpleBufferWriter {
             uint8_t* write_component(uint8_t* dest, const uint8_t* dest_end,
                                      uint8_t* dyn_cursor) const override;
 
-           private:
+           protected:
             TestOneOfWriter(Tag tag, Value value);
 
             Tag tag;
@@ -75,7 +75,7 @@ class RequestWriter : public simplebuffers::SimpleBufferWriter {
         uint8_t* write_component(uint8_t* dest, const uint8_t* dest_end,
                                  uint8_t* dyn_cursor) const override;
 
-       private:
+       protected:
         PayloadWriter(Tag tag, Value value);
 
         Tag tag;
@@ -129,10 +129,34 @@ class MoveToEntryWriter : public simplebuffers::SimpleBufferWriter {
 
 class StringTestWriter : public simplebuffers::SimpleBufferWriter {
    public:
-    StringTestWriter(const char* test, int64_t string);
+    class FieldsWriter : public simplebuffers::OneOfWriter {
+       public:
+        enum class Tag : uint8_t {
+            TEST = 0,
+            STRING = 1
+        };
 
-    const char* test;
-    int64_t string;
+        union Value {
+            const char** test;
+            int64_t* string;
+        };
+
+        static FieldsWriter test(const char** val);
+        static FieldsWriter string(int64_t* val);
+
+        uint8_t* write_component(uint8_t* dest, const uint8_t* dest_end,
+                                 uint8_t* dyn_cursor) const override;
+
+       protected:
+        FieldsWriter(Tag tag, Value value);
+
+        Tag tag;
+        Value value;
+    };
+
+    StringTestWriter(FieldsWriter fields);
+
+    FieldsWriter fields;
 
     uint16_t static_size() const override;
     uint8_t* write_component(uint8_t* dest, const uint8_t* dest_end,
@@ -146,42 +170,88 @@ class MoveToEntryReader;
 class StringTestReader;
 
 class RequestReader : public simplebuffers::SimpleBufferReader {
-   public:
-    uint32_t id() const;
-    PayloadReader payload() const;
-    
+    public:
+    class PayloadReader : public simplebuffers::OneOfReader {
+       public:
+        class TestOneOfReader : public simplebuffers::OneOfReader {
+           public:
+            enum class Tag : uint8_t {
+                MOVE_TO_ENTRY = 0,
+                STRING_TEST = 1,
+                BIG_BOY = 2
+            };
+
+            TestOneOfReader(uint8_t* data_ptr, size_t data_len = 0);
+            Tag tag() const;
+            MoveToEntryReader move_to_entry() const;
+            StringTestReader string_test() const;
+            BigBoy big_boy() const;
+
+           protected:
+            Tag tag;
+        };
+
+        enum class Tag : uint8_t {
+            INIT = 0,
+            MOVE_TO = 1,
+            TEST_ONE_OF = 2
+        };
+
+        PayloadReader(uint8_t* data_ptr, size_t data_len = 0);
+        Tag tag() const;
+        InitReader init() const;
+        MoveToReader move_to() const;
+        TestOneOfReader test_one_of() const;
+
+       protected:
+        Tag tag;
+    };
+
     uint16_t static_size() const override;
+    uint32_t id() const;
+        PayloadReader payload() const;
 };
 
 class InitReader : public simplebuffers::SimpleBufferReader {
-   public:
-    uint32_t expected_firmware() const;
-    
+    public:
     uint16_t static_size() const override;
+    uint32_t expected_firmware() const;
 };
 
 class MoveToReader : public simplebuffers::SimpleBufferReader {
-   public:
-    simplebuffers::ArrayReader<MoveToEntryWriter> joints() const;
-    
+    public:
     uint16_t static_size() const override;
+    simplebuffers::ArrayReader<MoveToEntryWriter> joints() const;
 };
 
 class MoveToEntryReader : public simplebuffers::SimpleBufferReader {
-   public:
-    RobotJoint joint() const;
-    float angle() const;
-    float speed() const;
-    
+    public:
     uint16_t static_size() const override;
+    RobotJoint joint() const;
+        float angle() const;
+        float speed() const;
 };
 
 class StringTestReader : public simplebuffers::SimpleBufferReader {
-   public:
-    const char* test() const;
-    int64_t string() const;
-    
+    public:
+    class FieldsReader : public simplebuffers::OneOfReader {
+       public:
+        enum class Tag : uint8_t {
+            TEST = 0,
+            STRING = 1
+        };
+
+        FieldsReader(uint8_t* data_ptr, size_t data_len = 0);
+        Tag tag() const;
+        const char* test() const;
+        int64_t string() const;
+
+       protected:
+        Tag tag;
+    };
+
     uint16_t static_size() const override;
+    FieldsReader fields() const;
 };
 
 } // namespace simplebuffers_test

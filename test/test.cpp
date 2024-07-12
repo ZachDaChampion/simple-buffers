@@ -159,20 +159,48 @@ uint8_t* MoveToEntryWriter::write_component(uint8_t* dest, const uint8_t* dest_e
  * StringTestWriter
  */
 
-StringTestWriter::StringTestWriter(const char* test, int64_t string):
-    test(test), string(string) {}
+StringTestWriter::StringTestWriter(FieldsWriter fields):
+    fields(fields) {}
 
-uint16_t StringTestWriter::static_size() const { return 10; }
+uint16_t StringTestWriter::static_size() const { return 3; }
 
 uint8_t* StringTestWriter::write_component(uint8_t* dest, const uint8_t* dest_end,
                          uint8_t* dyn_cursor) const {
-    if (dest_end - dest < 10) return nullptr;
-    dyn_cursor = simplebuffers::write_field(dest, dest_end, dyn_cursor, test);
-    if (dyn_cursor == nullptr) return nullptr;
-    dest += simplebuffers::get_static_size(test);
-    dyn_cursor = simplebuffers::write_field(dest, dest_end, dyn_cursor, string);
+    if (dest_end - dest < 3) return nullptr;
+    dyn_cursor = simplebuffers::write_field(dest, dest_end, dyn_cursor, fields);
     if (dyn_cursor == nullptr) return nullptr;
     return dyn_cursor;
 }
+
+/*
+ * StringTestWriter::FieldsWriter
+ */
+
+StringTestWriter::FieldsWriter StringTestWriter::FieldsWriter::test(const char** val) {
+    Value v;
+    v.test = val;
+    return FieldsWriter(Tag::TEST, v);
+}
+
+StringTestWriter::FieldsWriter StringTestWriter::FieldsWriter::string(int64_t* val) {
+    Value v;
+    v.string = val;
+    return FieldsWriter(Tag::STRING, v);
+}
+
+uint8_t* StringTestWriter::FieldsWriter::write_component(uint8_t* dest, const uint8_t* dest_end,
+                         uint8_t* dyn_cursor) const {
+    switch (tag) {
+        case Tag::TEST:
+            return simplebuffers::write_oneof_field(dest, dest_end, dyn_cursor, 0, *value.test);
+        case Tag::STRING:
+            return simplebuffers::write_oneof_field(dest, dest_end, dyn_cursor, 1, *value.string);
+        default:
+            return nullptr;
+    }
+}
+
+StringTestWriter::FieldsWriter::FieldsWriter(Tag tag, Value value) : tag(tag), value(value) {}
+
 
 } // namespace simplebuffers_test

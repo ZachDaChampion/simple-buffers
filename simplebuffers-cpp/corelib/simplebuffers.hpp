@@ -581,6 +581,37 @@ const char* ArrayReader<const char*>::read(uint16_t idx) const {
 }
 
 //                                                                                                //
+// ======================================== OneOf Reader ======================================== //
+//                                                                                                //
+
+/**
+ * @brief A class for reading OneOf fields from a simple buffer. Specific OneOf readers should
+ *        inherit from this class.
+ */
+class OneOfReader : public SimpleBufferReader {
+   public:
+    /**
+     * Construct a new OneOfReader object.
+     *
+     * @param[in] data_ptr A pointer to this component's location in a data buffer.
+     * @param[in] data_len The length of the data buffer (measured from `data_ptr` to end).
+     */
+    OneOfReader(uint8_t* data_ptr, size_t data_len = 0) : SimpleBufferReader(data_ptr, data_len) {}
+
+    /**
+     * @brief Returns the static size of the object.
+     *
+     * The number returned by this function represents the size of all statically-sized fields in
+     * a component. Dynamically-sized fields are not included in this number, but relative offsets
+     * are. These offsets are used to determine the location of dynamically-sized fields in the
+     * buffer.
+     *
+     * @return The static size of the object.
+     */
+    uint16_t static_size() const override { return 4; }
+};
+
+//                                                                                                //
 // ========================================= Read field ========================================= //
 //                                                                                                //
 

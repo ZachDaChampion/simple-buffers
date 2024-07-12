@@ -251,7 +251,7 @@ fn define_oneof_writer(oneof: &CppOneOf) -> String {
            public:
             {public_body}
 
-           private:
+           protected:
             {class_name}(Tag tag, Value value);
         
             Tag tag;
@@ -272,28 +272,99 @@ fn define_sequence_reader(seq: &CppSequence) -> String {
     // The full name of the sequence writer class, in the form "SequenceReader".
     let class_name = seq.to_reader_string();
 
-    // Generate code to declare accessor functions for each field.
-    let fields = seq
-        .fields
-        .iter()
-        .map(|f| {
-            format!(
-                "{ty} {name}() const;",
-                ty = f.ty.to_reader_string(),
-                name = f.name
-            )
-        })
-        .join("\n");
+    let body = {
+        // Generate code to declare accessor functions for each field.
+        let fields = seq
+            .fields
+            .iter()
+            .map(|f| {
+                format!(
+                    "{ty} {name}() const;",
+                    ty = f.ty.to_reader_string(),
+                    name = f.name
+                )
+            })
+            .join("\n");
+
+        // Generate class definitions of any oneof fields contained in the sequence. These are
+        // subclasses of this sequence class.
+        let oneofs = seq.oneofs().map(define_oneof_reader).join("\n\n");
+
+        // Generate class body.
+        formatdoc! {
+            r"
+            public:
+            {oneofs}
+
+            uint16_t static_size() const override;
+            {fields}",
+            fields = indent_by(4, fields.trim())
+        }
+    };
 
     // Generate full class code.
     formatdoc! {
         r"
         class {class_name} : public simplebuffers::SimpleBufferReader {{
-           public:
-            {fields}
-            
-            uint16_t static_size() const override;
+            {body}
         }};",
-        fields = indent_by(4, fields.trim())
+        body = indent_by(4, body.trim())
+    }
+}
+
+/// Generates the C++ code for defining a oneof reader. This should be written as a subclass of a
+/// sequence reader. Because oneofs can contain other oneofs as fields, we must recursively define
+/// any oneof reader we find.
+fn define_oneof_reader(oneof: &CppOneOf) -> String {
+    // The full name of the oneof reader class, in the form "OneOfReader".
+    let class_name = oneof.to_reader_string();
+
+    // Generate the public portion of the body. This is done separately so that we can trim it and
+    // remove the extra white space generated when there are no oneof fields.
+    let public_body = {
+        // Generate class definitions of any oneof fields. These are subclasses of this oneof class
+        // and are generated recursively.
+        let oneofs = oneof.oneofs().map(define_oneof_reader).join("\n\n");
+
+        // Generate a list of tags for the fields. These are members of the `Tag` enum class.
+        let tags = oneof
+            .fields
+            .iter()
+            .map(|f| format!("{} = {}", f.tag, f.index))
+            .join(",\n");
+
+        // Generate a list of possible values for each oneof field. These are held in a union and
+        // are stored as pointers.
+        let fields = oneof
+            .fields
+            .iter()
+            .map(|f| format!("{} {}() const;", f.ty.to_reader_string(), f.name))
+            .join("\n");
+
+        formatdoc! {
+            r"
+            {oneofs}
+
+            enum class Tag : uint8_t {{
+                {tags}
+            }};
+            
+            {class_name}(uint8_t* data_ptr, size_t data_len = 0);
+            Tag tag() const;
+            {fields}",
+            tags = indent_by(4, tags)
+        }
+    };
+
+    formatdoc! {
+        r"
+        class {class_name} : public simplebuffers::OneOfReader {{
+           public:
+            {public_body}
+
+           protected:
+            Tag tag;
+        }};",
+        public_body = indent_by(4, public_body.trim())
     }
 }
