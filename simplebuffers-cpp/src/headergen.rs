@@ -91,7 +91,7 @@ pub(crate) fn generate_header(params: &CppGeneratorParams, schema: &CppSchema) -
 }
 
 //                                                                                                //
-// ================================== Generate File Components ================================== //
+// ================================= Generate Writer Components ================================= //
 //                                                                                                //
 
 /// Generates the C++ code for defining an enum.
@@ -115,6 +115,10 @@ fn define_enum(data: &CppEnum) -> String {
         enum class {name} : {dtype} {{
             {variants}
         }};",
+        // uint16_t get_static_size(const {name} val) {{ return {size}; }}",
+        // uint8_t* write_field(uint8_t* dest, const uint8_t* dest_end, uint8_t* dyn_cursor, const {name}& val) {{
+        //     return simplebuffers::write_field(dest, dest_end, dyn_cursor, static_cast<const {min_dtype}>(val));
+        // }}",
         variants = indent_by(4, variants)
     }
 }
@@ -161,8 +165,7 @@ fn define_sequence_writer(seq: &CppSequence) -> String {
             {members}
 
             uint16_t static_size() const override;
-            uint8_t* write_component(uint8_t* dest, const uint8_t* dest_end,
-                                     uint8_t* dyn_cursor) const override;"
+            uint8_t* write_component(uint8_t* dest, const uint8_t* dest_end, uint8_t* dyn_cursor) const override;"
         }
     };
 
@@ -237,8 +240,7 @@ fn define_oneof_writer(oneof: &CppOneOf) -> String {
             
             {constructors}
 
-            uint8_t* write_component(uint8_t* dest, const uint8_t* dest_end,
-                                     uint8_t* dyn_cursor) const override;",
+            uint8_t* write_component(uint8_t* dest, const uint8_t* dest_end, uint8_t* dyn_cursor) const override;",
             tags = indent_by(4, tags),
             values = indent_by(4, values)
         }
@@ -254,12 +256,16 @@ fn define_oneof_writer(oneof: &CppOneOf) -> String {
            protected:
             {class_name}(Tag tag, Value value);
         
-            Tag tag;
-            Value value;
+            Tag tag_;
+            Value value_;
         }};",
         public_body = indent_by(4, public_body.trim()),
     }
 }
+
+//                                                                                                //
+// ================================= Generate Reader Components ================================= //
+//                                                                                                //
 
 /// Generates the C++ code for forward declaring sequence readers.
 fn forward_declare_sequence_reader(seq: &CppSequence) -> String {
@@ -296,9 +302,9 @@ fn define_sequence_reader(seq: &CppSequence) -> String {
             public:
             {oneofs}
 
+            {class_name}(const uint8_t* data_ptr, size_t idx = 0);
             uint16_t static_size() const override;
-            {fields}",
-            fields = indent_by(4, fields.trim())
+            {fields}"
         }
     };
 
@@ -349,7 +355,7 @@ fn define_oneof_reader(oneof: &CppOneOf) -> String {
                 {tags}
             }};
             
-            {class_name}(uint8_t* data_ptr, size_t data_len = 0);
+            {class_name}(const uint8_t* data_ptr, size_t idx = 0);
             Tag tag() const;
             {fields}",
             tags = indent_by(4, tags)
@@ -363,7 +369,7 @@ fn define_oneof_reader(oneof: &CppOneOf) -> String {
             {public_body}
 
            protected:
-            Tag tag;
+            Tag tag_;
         }};",
         public_body = indent_by(4, public_body.trim())
     }

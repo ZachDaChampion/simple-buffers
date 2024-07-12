@@ -13,13 +13,14 @@ enum BigBoy {
 
 sequence Request {
     id: u32;
+    enmArray: [RobotJoint];
     payload: oneof {
         init: Init;
         moveTo: MoveTo;
         testOneOf: oneof {
             moveToEntry: MoveToEntry;
-            stringTest: StringTest;
             bigBoy: BigBoy;
+            stringTest: StringTest;
         };
     };
 }

@@ -7,8 +7,6 @@ use simplebuffers_core::SBSchema;
 use simplebuffers_core::Sequence;
 use simplebuffers_core::Type;
 
-use crate::argparse::CppGeneratorParams;
-
 #[derive(Debug)]
 pub(crate) struct CppSchema {
     pub sequences: Vec<CppSequence>,
@@ -49,6 +47,9 @@ pub(crate) struct CppSequenceField {
 
     /// The type of the field.
     pub ty: CppType,
+
+    /// The position of the field in the sequence.
+    pub pos: usize,
 }
 
 /// A field, annotated and adjusted for C++ conventions.
@@ -70,6 +71,16 @@ pub(crate) struct CppOneOfField {
     pub index: usize,
 }
 
+/// A oneof, annotated and adjusted for C++ conventions.
+#[derive(Debug)]
+pub(crate) struct CppOneOf {
+    /// The name of the oneof.
+    pub name: String,
+
+    /// The fields of the oneof.
+    pub fields: Vec<CppOneOfField>,
+}
+
 /// A type, annotated and adjusted for C++ conventions.
 #[derive(Debug)]
 pub(crate) enum CppType {
@@ -80,14 +91,20 @@ pub(crate) enum CppType {
     OneOf(CppOneOf),
 }
 
-/// A oneof, annotated and adjusted for C++ conventions.
-#[derive(Debug)]
-pub(crate) struct CppOneOf {
-    /// The name of the oneof.
-    pub name: String,
+pub(crate) trait SizeToType {
+    fn to_type(&self) -> &str;
+}
 
-    /// The fields of the oneof.
-    pub fields: Vec<CppOneOfField>,
+impl SizeToType for usize {
+    fn to_type(&self) -> &str {
+        match self {
+            1 => "uint8_t",
+            2 => "uint16_t",
+            4 => "uint32_t",
+            8 => "uint64_t",
+            _ => panic!("Cannot convert size {} to C++ type", self),
+        }
+    }
 }
 
 impl CppEnum {
@@ -118,7 +135,7 @@ impl CppSequenceField {
     /// Returns a version of this field's name, cast to the appropriate type for serialization. This
     /// only affects enums.
     pub(crate) fn cast(&self) -> String {
-        match self.ty {
+        match &self.ty {
             CppType::Enum(_, size) => format!(
                 "static_cast<{}>({})",
                 match size {
@@ -130,6 +147,25 @@ impl CppSequenceField {
                 },
                 self.name
             ),
+            CppType::Array(b) => match **b {
+                CppType::Enum(_, size) => format!(
+                    "simplebuffers::priv::ListWriterImpl<{sizetype}>(reinterpret_cast<{sizetype}* const>({name}.val), {name}.len)",
+                    sizetype = match size {
+                        1 => "uint8_t",
+                        2 => "uint16_t",
+                        4 => "uint32_t",
+                        8 => "uint64_t",
+                        _ => panic!("Invalid size {} for enum {}", size, self.name),
+                    },
+                    name = self.name
+                ),
+                _ => {
+                    format!(
+                        "simplebuffers::priv::ListWriterImpl<{dtype}>({name}.val, {name}.len)",
+                        dtype=b.to_writer_string(),
+                        name = self.name)
+                    }
+            },
             _ => self.name.to_string(),
         }
     }
@@ -142,6 +178,46 @@ impl CppOneOf {
             CppType::OneOf(o) => Some(o),
             _ => None,
         })
+    }
+}
+
+impl CppOneOfField {
+    /// Returns a version of this field's name, accessed from the `value` union and cast if
+    /// necessary.
+    pub(crate) fn write_cast(&self) -> String {
+        match &self.ty {
+            CppType::Enum(_, size) => format!(
+                "static_cast<{}>(*value_.{})",
+                match size {
+                    1 => "uint8_t",
+                    2 => "uint16_t",
+                    4 => "uint32_t",
+                    8 => "uint64_t",
+                    _ => panic!("Invalid size {} for enum {}", size, self.name),
+                },
+                self.name
+            ),
+            CppType::Array(b) => match **b {
+                CppType::Enum(_, size) => format!(
+                    "simplebuffers::priv::ListWriterImpl<{sizetype}>(reinterpret_cast<{sizetype}* const>(*value.{name}.val), *value.{name}.len)",
+                    sizetype = match size {
+                        1 => "uint8_t",
+                        2 => "uint16_t",
+                        4 => "uint32_t",
+                        8 => "uint64_t",
+                        _ => panic!("Invalid size {} for enum {}", size, self.name),
+                    },
+                    name = self.name
+                ),
+                _ => {
+                format!(
+                    "simplebuffers::priv::ListWriterImpl<{dtype}>(*value.{name}.val, *value.{name}.len)",
+                    dtype=b.to_writer_string(),
+                    name = self.name)
+                }
+            },
+            _ => format!("*value_.{}", self.name),
+        }
     }
 }
 
@@ -162,7 +238,7 @@ impl ToReaderWriterString for CppType {
             CppType::Sequence(s) => format!("{}Writer", s).to_case(Case::Pascal),
             CppType::Enum(e, _) => e.clone(),
             CppType::Array(t) => {
-                format!("simplebuffers::ArrayWriter<{}>", t.to_writer_string())
+                format!("simplebuffers::ListWriter<{}>", t.to_writer_string())
             }
             CppType::OneOf(o) => format!("{}Writer", o.name).to_case(Case::Pascal),
         }
@@ -174,7 +250,15 @@ impl ToReaderWriterString for CppType {
             CppType::Sequence(s) => format!("{}Reader", s).to_case(Case::Pascal),
             CppType::Enum(e, _) => e.clone(),
             CppType::Array(t) => {
-                format!("simplebuffers::ArrayReader<{}>", t.to_writer_string())
+                if let CppType::Enum(_, size) = t.as_ref() {
+                    format!(
+                        "simplebuffers::ListReader<{}, {}>",
+                        t.to_reader_string(),
+                        size.to_type()
+                    )
+                } else {
+                    format!("simplebuffers::ListReader<{}>", t.to_reader_string())
+                }
             }
             CppType::OneOf(o) => format!("{}Reader", o.name).to_case(Case::Pascal),
         }
@@ -203,18 +287,10 @@ impl ToReaderWriterString for CppOneOf {
 
 /// Take a schema and annotate it for use with C++. This will adjust naming to match C++ convention,
 /// and will add extra data that is necessary for C++ code generation.
-pub(crate) fn annotate_schema(params: &CppGeneratorParams, schema: &SBSchema) -> CppSchema {
+pub(crate) fn annotate_schema(schema: &SBSchema) -> CppSchema {
     CppSchema {
-        sequences: schema
-            .sequences
-            .iter()
-            .map(|s| annotate_sequence(params, s))
-            .collect(),
-        enums: schema
-            .enums
-            .iter()
-            .map(|e| annotate_enum(params, e))
-            .collect(),
+        sequences: schema.sequences.iter().map(annotate_sequence).collect(),
+        enums: schema.enums.iter().map(annotate_enum).collect(),
     }
 }
 
@@ -227,7 +303,7 @@ pub(crate) fn annotate_schema(params: &CppGeneratorParams, schema: &SBSchema) ->
 /// # Returns
 ///
 /// An enum, formatted for C++ code generation.
-fn annotate_enum(_params: &CppGeneratorParams, original: &Enum) -> CppEnum {
+fn annotate_enum(original: &Enum) -> CppEnum {
     CppEnum {
         name: original.name.to_case(Case::Pascal),
         size: original.size,
@@ -243,37 +319,41 @@ fn annotate_enum(_params: &CppGeneratorParams, original: &Enum) -> CppEnum {
 ///
 /// # Arguments
 ///
+/// * `name_stack` - The current stack of namespaces.
 /// * `seq` - The sequence to annotate.
 ///
 /// # Returns
 ///
 /// A sequence, formatted for C++ code generation.
-fn annotate_sequence(params: &CppGeneratorParams, seq: &Sequence) -> CppSequence {
-    CppSequence {
-        name: seq.name.to_case(Case::Pascal),
-        fields: seq
-            .fields
-            .iter()
-            .map(|f| CppSequenceField {
-                name: f.name.to_case(Case::Snake),
-                ty: annotate_type(params, &f.ty, f.name.as_str()),
-            })
-            .collect(),
-        size: seq.fields.iter().fold(0, |acc, f| acc + f.ty.size()),
-    }
+fn annotate_sequence(seq: &Sequence) -> CppSequence {
+    let name = seq.name.to_case(Case::Pascal);
+    let size = seq.fields.iter().fold(0, |acc, f| acc + f.ty.size());
+
+    let fields = seq
+        .fields
+        .iter()
+        .map(|f| CppSequenceField {
+            name: f.name.to_case(Case::Snake),
+            ty: annotate_type(&f.ty, f.name.as_str()),
+            pos: f.index,
+        })
+        .collect();
+
+    CppSequence { name, fields, size }
 }
 
 /// Annotate a Type.
 ///
 /// # Arguments
 ///
+/// * `name_stack` - The current stack of namespaces.
 /// * `ty` - The type to annotate.
 /// * `field_name` - The name of the field that the type is associated with.
 ///
 /// # Returns
 ///
 /// An annotated CppType.
-fn annotate_type(params: &CppGeneratorParams, ty: &Type, field_name: &str) -> CppType {
+fn annotate_type(ty: &Type, field_name: &str) -> CppType {
     match ty {
         Type::Primitive(p) => CppType::Primitive(match p {
             Primitive::Bool => "bool",
@@ -290,9 +370,9 @@ fn annotate_type(params: &CppGeneratorParams, ty: &Type, field_name: &str) -> Cp
         }),
         Type::Sequence(s) => CppType::Sequence(s.to_case(Case::Pascal)),
         Type::Enum(e, s) => CppType::Enum(e.to_case(Case::Pascal), *s),
-        Type::Array(t) => CppType::Array(Box::new(annotate_type(params, t, field_name))),
+        Type::Array(t) => CppType::Array(Box::new(annotate_type(t, field_name))),
         Type::String => CppType::Primitive("const char*"),
-        Type::OneOf(o) => CppType::OneOf(annotate_oneof(params, o, field_name)),
+        Type::OneOf(o) => CppType::OneOf(annotate_oneof(o, field_name)),
     }
 }
 
@@ -300,24 +380,26 @@ fn annotate_type(params: &CppGeneratorParams, ty: &Type, field_name: &str) -> Cp
 ///
 /// # Arguments
 ///
+/// * `name_stack` - The current stack of namespaces.
 /// * `subfields` - A list of the oneof's fields.
 /// * `field_name` - The name of the field holding the oneof.
 ///
 /// # Returns
 ///
 /// An annotated CppOneOf.
-fn annotate_oneof(params: &CppGeneratorParams, subfields: &[Field], field_name: &str) -> CppOneOf {
-    CppOneOf {
-        name: field_name.to_case(Case::Pascal),
-        fields: (subfields
-            .iter()
-            .map(|f| CppOneOfField {
-                name: f.name.to_case(Case::Snake),
-                tag: f.name.to_case(Case::UpperSnake),
-                constructor: f.name.to_case(Case::Snake),
-                ty: annotate_type(params, &f.ty, f.name.as_str()),
-                index: f.index,
-            })
-            .collect()),
-    }
+fn annotate_oneof(subfields: &[Field], field_name: &str) -> CppOneOf {
+    let name = field_name.to_case(Case::Pascal);
+
+    let fields = subfields
+        .iter()
+        .map(|f| CppOneOfField {
+            name: f.name.to_case(Case::Snake),
+            tag: f.name.to_case(Case::UpperSnake),
+            constructor: f.name.to_case(Case::Snake),
+            ty: annotate_type(&f.ty, f.name.as_str()),
+            index: f.index,
+        })
+        .collect();
+
+    CppOneOf { name, fields }
 }

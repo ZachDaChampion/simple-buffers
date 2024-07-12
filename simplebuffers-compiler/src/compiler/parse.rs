@@ -322,15 +322,33 @@ fn parse_enum<'a>(
 
 /// Finds any enum fields that match the given name and injects the given size into them.
 fn inject_enum_size_into(enum_name: &str, enum_size: usize, fields: &mut [Field]) {
-    for field in fields {
-        match &mut field.ty {
+    /// Injects the enum into a single Type instance. Returns the size that the field increased by
+    /// so that it can be added to `adjust_by`.
+    fn process_type(enum_name: &str, enum_size: usize, ty: &mut Type) -> usize {
+        match ty {
             Type::Enum(found_name, found_size) => {
                 if found_name == enum_name {
                     *found_size = enum_size;
+                    enum_size
+                } else {
+                    0
                 }
             }
-            Type::OneOf(subfields) => inject_enum_size_into(enum_name, enum_size, subfields),
-            _ => {}
+            Type::Array(b) => {
+                process_type(enum_name, enum_size, b.as_mut());
+                0
+            }
+            Type::OneOf(subfields) => {
+                inject_enum_size_into(enum_name, enum_size, subfields);
+                0
+            }
+            _ => 0,
         }
+    }
+
+    let mut adjust_by = 0;
+    for field in fields {
+        field.index += adjust_by;
+        adjust_by += process_type(enum_name, enum_size, &mut field.ty);
     }
 }
