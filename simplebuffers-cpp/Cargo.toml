@@ -10,7 +10,7 @@ crate-type = ["lib", "dylib"]
 simplebuffers-core = { path = "../simplebuffers-core" }
 simplebuffers-codegen = { path = "../simplebuffers-codegen" }
 clap = { version = "4.5.8", features = ["derive"] }
-convert_case = "0.6.0"
 indoc = "2.0.5"
 itertools = "0.13.0"
 indent = "0.1.1"
+convert_case = "0.6.0"

@@ -1,14 +1,11 @@
-use convert_case::Casing;
-use indent::indent_by;
-use indoc::formatdoc;
-
-use itertools::Itertools;
-
 use crate::annotate::CppOneOf;
 use crate::annotate::CppSchema;
 use crate::annotate::CppSequence;
 use crate::annotate::ToReaderWriterString;
 use crate::argparse::CppGeneratorParams;
+use indent::indent_by;
+use indoc::formatdoc;
+use itertools::Itertools;
 
 //                                                                                                //
 // ======================================= Main Function ======================================== //
@@ -29,13 +26,13 @@ pub(crate) fn generate_source(params: &CppGeneratorParams, schema: &CppSchema) -
     let header_name = format!("{}.hpp", params.global.file_name);
 
     // Generate namespace name.
-    let namespace = format!("simplebuffers_{}", params.global.file_name).to_case(params.ns_case);
+    let namespace = format!("simplebuffers_{}", params.global.file_name);
 
     // Generate full implementations for sequence writers.
     let sequence_writers = schema
         .sequences
         .iter()
-        .map(|s| impl_sequence_writer(params, s))
+        .map(impl_sequence_writer)
         .join("\n\n");
 
     // Generate the full source file.
@@ -43,10 +40,11 @@ pub(crate) fn generate_source(params: &CppGeneratorParams, schema: &CppSchema) -
         r#"
         #include "{header_name}"
 
-        namespace simplebuffers = _sb;
-        namespace {namespace} = _sbs;
+        namespace {namespace} {{
 
-        {sequence_writers}"#
+        {sequence_writers}
+        
+        }} // namespace {namespace}"#
     }
     .replace("\n\n\n", "\n")
 }
@@ -56,10 +54,10 @@ pub(crate) fn generate_source(params: &CppGeneratorParams, schema: &CppSchema) -
 //                                                                                                //
 
 /// Generates the C++ code for implementing a sequence.
-fn impl_sequence_writer(params: &CppGeneratorParams, sequence: &CppSequence) -> String {
+fn impl_sequence_writer(sequence: &CppSequence) -> String {
     // The full name of the sequence writer class, in the form "SequenceWriter" (formatted for
     // casing preference).
-    let class_name = sequence.to_writer_string(params);
+    let class_name = sequence.to_writer_string();
 
     // Comment that indicates the beginning of this sequence's section.
     let section_comment = section_comment(&class_name);
@@ -68,7 +66,7 @@ fn impl_sequence_writer(params: &CppGeneratorParams, sequence: &CppSequence) -> 
     let param_list = sequence
         .fields
         .iter()
-        .map(|f| format!("{} {}", f.ty.to_writer_string(params), f.name))
+        .map(|f| format!("{} {}", f.ty.to_writer_string(), f.name))
         .join(", ");
 
     // Generate the initialization list for the constructor.
@@ -90,15 +88,15 @@ fn impl_sequence_writer(params: &CppGeneratorParams, sequence: &CppSequence) -> 
             if i < sequence.fields.len() - 1 {
                 // Not last field, increment dest.
                 formatdoc! {r"
-                    dyn_cursor = __sb::write_field(dest, dest_end, dyn_cursor, {cast});
+                    dyn_cursor = simplebuffers::write_field(dest, dest_end, dyn_cursor, {cast});
                     if (dyn_cursor == nullptr) return nullptr;
-                    dest += __sb::get_static_size({cast});",
+                    dest += simplebuffers::get_static_size({cast});",
                     cast = f.cast()
                 }
             } else {
                 // Last field, don't need to increment dest.
                 formatdoc! {r"
-                    dyn_cursor = __sb::write_field(dest, dest_end, dyn_cursor, {cast});
+                    dyn_cursor = simplebuffers::write_field(dest, dest_end, dyn_cursor, {cast});
                     if (dyn_cursor == nullptr) return nullptr;",
                     cast = f.cast()
                 }
@@ -107,7 +105,7 @@ fn impl_sequence_writer(params: &CppGeneratorParams, sequence: &CppSequence) -> 
         .join("\n");
 
     // Generate all implementation code for oneof fields in this sequence.
-    let oneofs = generate_oneofs(params, sequence);
+    let oneofs = generate_oneofs(sequence);
 
     // Generate sequence code.
     // TODO: Find out if we should be comparing to `static_size` or `static_size - 1`.
@@ -139,23 +137,23 @@ fn impl_sequence_writer(params: &CppGeneratorParams, sequence: &CppSequence) -> 
 /// # Returns
 ///
 /// A string with code for all of the sequence's oneof fields.
-fn generate_oneofs(params: &CppGeneratorParams, sequence: &CppSequence) -> String {
+fn generate_oneofs(sequence: &CppSequence) -> String {
     enum Visitor<'a> {
         Visit(&'a CppOneOf),
         PopName,
     }
 
     let mut generated = String::new();
-    let mut name_stack = vec![sequence.to_writer_string(params)];
+    let mut name_stack = vec![sequence.to_writer_string()];
     let mut visit_stack = sequence.oneofs().rev().map(Visitor::Visit).collect_vec();
 
     while let Some(visit) = visit_stack.pop() {
         match visit {
             Visitor::Visit(oneof) => {
-                name_stack.push(oneof.to_writer_string(params));
+                name_stack.push(oneof.to_writer_string());
                 let full_name = name_stack.join("::");
                 generated += &format!("{}\n\n", section_comment(&full_name));
-                generated += &format!("{}\n\n", visit_oneof(params, oneof, &name_stack));
+                generated += &format!("{}\n\n", visit_oneof(oneof, &name_stack));
                 visit_stack.push(Visitor::PopName);
                 for sub_oneof in oneof.oneofs().rev() {
                     visit_stack.push(Visitor::Visit(sub_oneof));
@@ -171,7 +169,7 @@ fn generate_oneofs(params: &CppGeneratorParams, sequence: &CppSequence) -> Strin
     generated
 }
 
-fn visit_oneof(params: &CppGeneratorParams, oneof: &CppOneOf, name_stack: &[String]) -> String {
+fn visit_oneof(oneof: &CppOneOf, name_stack: &[String]) -> String {
     // The full name of the oneof writer class, in the form "namespace::SequenceWriter" (formatted
     // for casing preference).
     let class_name = name_stack
@@ -190,7 +188,7 @@ fn visit_oneof(params: &CppGeneratorParams, oneof: &CppOneOf, name_stack: &[Stri
                     return {class_name}(Tag::{tag}, v);
                 }}",
                 constructor = f.constructor,
-                field_type = f.ty.to_writer_string(params),
+                field_type = f.ty.to_writer_string(),
                 name = f.name,
                 tag = f.tag
             }
@@ -204,7 +202,7 @@ fn visit_oneof(params: &CppGeneratorParams, oneof: &CppOneOf, name_stack: &[Stri
         .map(|f| {
             formatdoc! {"
                 case Tag::{tag}:
-                    return __sb::write_oneof_field(dest, dest_end, dyn_cursor, {index}, *value.{name});",
+                    return simplebuffers::write_oneof_field(dest, dest_end, dyn_cursor, {index}, *value.{name});",
                 tag = f.tag,
                 index = f.index,
                 name = f.name

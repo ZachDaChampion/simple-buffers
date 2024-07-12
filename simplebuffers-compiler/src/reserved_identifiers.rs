@@ -1,9 +1,8 @@
-use std::fmt::{self};
-
 use colored::Colorize;
 use convert_case::{Case, Casing};
 use itertools::Itertools;
 use simplebuffers_core::{Field, SBSchema, Type};
+use std::fmt::{self};
 
 enum ReserveCheckErrorTarget {
     Sequence,

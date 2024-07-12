@@ -45,8 +45,7 @@ impl CodeGenerator for CPPCodeGenerator {
         _params: &simplebuffers_codegen::GeneratorParams,
     ) -> Vec<String> {
         vec![
-            "__sb",
-            "__sbs",
+            "simplebuffers",
             "alignas",
             "alignof",
             "and",

@@ -42,9 +42,9 @@ class RequestWriter : public simplebuffers::SimpleBufferWriter {
                 BigBoy* big_boy;
             };
 
-            static TestOneOfWriter MoveToEntry(MoveToEntryWriter* val);
-            static TestOneOfWriter StringTest(StringTestWriter* val);
-            static TestOneOfWriter BigBoy(BigBoy* val);
+            static TestOneOfWriter move_to_entry(MoveToEntryWriter* val);
+            static TestOneOfWriter string_test(StringTestWriter* val);
+            static TestOneOfWriter big_boy(BigBoy* val);
 
             uint8_t* write_component(uint8_t* dest, const uint8_t* dest_end,
                                      uint8_t* dyn_cursor) const override;
@@ -68,9 +68,9 @@ class RequestWriter : public simplebuffers::SimpleBufferWriter {
             TestOneOfWriter* test_one_of;
         };
 
-        static PayloadWriter Init(InitWriter* val);
-        static PayloadWriter MoveTo(MoveToWriter* val);
-        static PayloadWriter TestOneOf(TestOneOfWriter* val);
+        static PayloadWriter init(InitWriter* val);
+        static PayloadWriter move_to(MoveToWriter* val);
+        static PayloadWriter test_one_of(TestOneOfWriter* val);
 
         uint8_t* write_component(uint8_t* dest, const uint8_t* dest_end,
                                  uint8_t* dyn_cursor) const override;

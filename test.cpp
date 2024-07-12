@@ -1,5 +1,4 @@
 #include "test.hpp"
-namespace _sb = simplebuffers;
 
 namespace simplebuffers_test {
 
@@ -27,19 +26,19 @@ uint8_t* RequestWriter::write_component(uint8_t* dest, const uint8_t* dest_end,
  * RequestWriter::PayloadWriter
  */
 
-RequestWriter::PayloadWriter RequestWriter::PayloadWriter::Init(InitWriter* val) {
+RequestWriter::PayloadWriter RequestWriter::PayloadWriter::init(InitWriter* val) {
     Value v;
     v.init = val;
     return PayloadWriter(Tag::INIT, v);
 }
 
-RequestWriter::PayloadWriter RequestWriter::PayloadWriter::MoveTo(MoveToWriter* val) {
+RequestWriter::PayloadWriter RequestWriter::PayloadWriter::move_to(MoveToWriter* val) {
     Value v;
     v.move_to = val;
     return PayloadWriter(Tag::MOVE_TO, v);
 }
 
-RequestWriter::PayloadWriter RequestWriter::PayloadWriter::TestOneOf(TestOneOfWriter* val) {
+RequestWriter::PayloadWriter RequestWriter::PayloadWriter::test_one_of(TestOneOfWriter* val) {
     Value v;
     v.test_one_of = val;
     return PayloadWriter(Tag::TEST_ONE_OF, v);
@@ -65,19 +64,19 @@ RequestWriter::PayloadWriter::PayloadWriter(Tag tag, Value value) : tag(tag), va
  * RequestWriter::PayloadWriter::TestOneOfWriter
  */
 
-RequestWriter::PayloadWriter::TestOneOfWriter RequestWriter::PayloadWriter::TestOneOfWriter::MoveToEntry(MoveToEntryWriter* val) {
+RequestWriter::PayloadWriter::TestOneOfWriter RequestWriter::PayloadWriter::TestOneOfWriter::move_to_entry(MoveToEntryWriter* val) {
     Value v;
     v.move_to_entry = val;
     return TestOneOfWriter(Tag::MOVE_TO_ENTRY, v);
 }
 
-RequestWriter::PayloadWriter::TestOneOfWriter RequestWriter::PayloadWriter::TestOneOfWriter::StringTest(StringTestWriter* val) {
+RequestWriter::PayloadWriter::TestOneOfWriter RequestWriter::PayloadWriter::TestOneOfWriter::string_test(StringTestWriter* val) {
     Value v;
     v.string_test = val;
     return TestOneOfWriter(Tag::STRING_TEST, v);
 }
 
-RequestWriter::PayloadWriter::TestOneOfWriter RequestWriter::PayloadWriter::TestOneOfWriter::BigBoy(BigBoy* val) {      
+RequestWriter::PayloadWriter::TestOneOfWriter RequestWriter::PayloadWriter::TestOneOfWriter::big_boy(BigBoy* val) {     
     Value v;
     v.big_boy = val;
     return TestOneOfWriter(Tag::BIG_BOY, v);
