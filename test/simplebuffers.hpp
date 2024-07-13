@@ -7,6 +7,65 @@
 namespace simplebuffers {
 
 //                                                                                                //
+// ========================================= Endianness ========================================= //
+//                                                                                                //
+
+#ifndef IS_BIG_ENDIAN
+#if defined(__cpp_lib_endian)
+#include <bit>
+#define IS_BIG_ENDIAN (std::endian::native == std::endian::big)
+#elif defined(__BYTE_ORDER__) && defined(__ORDER_BIG_ENDIAN__) && defined(__ORDER_LITTLE_ENDIAN__)
+#define IS_BIG_ENDIAN (__BYTE_ORDER__ == __ORDER_BIG_ENDIAN__)
+#elif defined(__BIG_ENDIAN__) || defined(__ARMEB__)
+#define IS_BIG_ENDIAN 1
+#elif defined(__LITTLE_ENDIAN__) || defined(__ARMEL__)
+#define IS_BIG_ENDIAN 0
+#else
+#define IS_BIG_ENDIAN -1
+#endif
+#endif
+
+inline uint16_t byteswap16(uint16_t value) {
+#if defined(__cpp_lib_byteswap)
+    return std::byteswap(value);
+#elif defined(__GNUC__) || defined(__clang__)
+    return __builtin_bswap16(value);
+#elif defined(_MSC_VER)
+    return _byteswap_ushort(value);
+#else
+    return (value << 8) | (value >> 8);
+#endif
+}
+
+inline uint32_t byteswap32(uint32_t value) {
+#if defined(__cpp_lib_byteswap)
+    return std::byteswap(value);
+#elif defined(__GNUC__) || defined(__clang__)
+    return __builtin_bswap32(value);
+#elif defined(_MSC_VER)
+    return _byteswap_ulong(value);
+#else
+    return ((value & 0x000000FFu) << 24) | ((value & 0x0000FF00u) << 8) |
+           ((value & 0x00FF0000u) >> 8) | ((value & 0xFF000000u) >> 24);
+#endif
+}
+
+inline uint64_t byteswap64(uint64_t value) {
+#if defined(__cpp_lib_byteswap)
+    return std::byteswap(value);
+#elif defined(__GNUC__) || defined(__clang__)
+    return __builtin_bswap64(value);
+#elif defined(_MSC_VER)
+    return _byteswap_uint64(value);
+#else
+    value = ((value & 0x00000000FFFFFFFFull) << 32) | ((value & 0xFFFFFFFF00000000ull) >> 32);
+    value = ((value & 0x0000FFFF0000FFFFull) << 16) | ((value & 0xFFFF0000FFFF0000ull) >> 16);
+    value = ((value & 0x00FF00FF00FF00FFull) << 8) | ((value & 0xFF00FF00FF00FF00ull) >> 8);
+    return value;
+#endif
+}
+
+//                                                                                                //
 // ===================================== SimpleBufferWriter ===================================== //
 //                                                                                                //
 
@@ -85,6 +144,254 @@ class SimpleBufferWriter {
 };
 
 //                                                                                                //
+// ====================================== Get static size ======================================= //
+//                                                                                                //
+
+/**
+ * @brief Returns the static size of a given value.
+ *
+ * This does not include dynamic data, such as strings or arrays.
+ *
+ * @param val The value to calculate the static size for.
+ * @return The static size of the value.
+ */
+inline uint16_t get_static_size(const uint8_t val) { return 1; }
+inline uint16_t get_static_size(const int8_t val) { return 1; }
+inline uint16_t get_static_size(const uint16_t val) { return 2; }
+inline uint16_t get_static_size(const int16_t val) { return 2; }
+inline uint16_t get_static_size(const uint32_t val) { return 4; }
+inline uint16_t get_static_size(const int32_t val) { return 4; }
+inline uint16_t get_static_size(const uint64_t val) { return 8; }
+inline uint16_t get_static_size(const int64_t val) { return 8; }
+inline uint16_t get_static_size(const float val) { return 4; }
+inline uint16_t get_static_size(const double val) { return 8; }
+inline uint16_t get_static_size(const bool val) { return 1; }
+inline uint16_t get_static_size(const SimpleBufferWriter& val) { return val.static_size(); }
+inline uint16_t get_static_size(char* const& val) { return 2; }
+
+//                                                                                                //
+// ======================================== Write field ========================================= //
+//                                                                                                //
+
+/**
+ * @brief Writes a field value to the destination buffer.
+ *
+ * @param dest The destination to write static data to.
+ * @param dest_end The end of the destination buffer.
+ * @param dyn_cursor The dynamic cursor for writing variable-length fields.
+ * @param val The value to write.
+ * @return A pointer to the end of the dynamic data written to the buffer, or `nullptr` if the
+ *         buffer was too small.
+ */
+inline uint8_t* write_field(uint8_t* dest, const uint8_t* dest_end, uint8_t* dyn_cursor,
+                            const uint8_t& val) {
+    dest[0] = val;
+    return dyn_cursor;
+}
+
+inline uint8_t* write_field(uint8_t* dest, const uint8_t* dest_end, uint8_t* dyn_cursor,
+                            const int8_t& val) {
+    dest[0] = val;
+    return dyn_cursor;
+}
+
+inline uint8_t* write_field(uint8_t* dest, const uint8_t* dest_end, uint8_t* dyn_cursor,
+                            const uint16_t& val) {
+#if IS_BIG_ENDIAN == 0
+    memcpy(dest, &val, sizeof(val));
+#elif IS_BIG_ENDIAN == 1
+    uint16_t sval = byteswap16(val);
+    memcpy(dest, &sval, sizeof(sval));
+#else
+    dest[0] = val & 0xFF;
+    dest[1] = val >> 8;
+#endif
+    return dyn_cursor;
+}
+
+inline uint8_t* write_field(uint8_t* dest, const uint8_t* dest_end, uint8_t* dyn_cursor,
+                            const int16_t& val) {
+#if IS_BIG_ENDIAN == 0
+    memcpy(dest, &val, sizeof(val));
+#elif IS_BIG_ENDIAN == 1
+    uint16_t sval = byteswap16(val);
+    memcpy(dest, &sval, sizeof(sval));
+#else
+    dest[0] = val & 0xFF;
+    dest[1] = val >> 8;
+#endif
+    return dyn_cursor;
+}
+
+inline uint8_t* write_field(uint8_t* dest, const uint8_t* dest_end, uint8_t* dyn_cursor,
+                            const uint32_t& val) {
+#if IS_BIG_ENDIAN == 0
+    memcpy(dest, &val, sizeof(val));
+#elif IS_BIG_ENDIAN == 1
+    uint32_t sval = byteswap32(val);
+    memcpy(dest, &sval, sizeof(sval));
+#else
+    dest[0] = val & 0xFF;
+    dest[1] = val >> 8;
+    dest[2] = val >> 16;
+    dest[3] = val >> 24;
+#endif
+    return dyn_cursor;
+}
+
+inline uint8_t* write_field(uint8_t* dest, const uint8_t* dest_end, uint8_t* dyn_cursor,
+                            const int32_t& val) {
+#if IS_BIG_ENDIAN == 0
+    memcpy(dest, &val, sizeof(val));
+#elif IS_BIG_ENDIAN == 1
+    uint32_t sval = byteswap32(val);
+    memcpy(dest, &sval, sizeof(sval));
+#else
+    dest[0] = val & 0xFF;
+    dest[1] = val >> 8;
+    dest[2] = val >> 16;
+    dest[3] = val >> 24;
+#endif
+    return dyn_cursor;
+}
+
+inline uint8_t* write_field(uint8_t* dest, const uint8_t* dest_end, uint8_t* dyn_cursor,
+                            const uint64_t& val) {
+#if IS_BIG_ENDIAN == 0
+    memcpy(dest, &val, sizeof(val));
+#elif IS_BIG_ENDIAN == 1
+    uint64_t sval = byteswap64(val);
+    memcpy(dest, &sval, sizeof(sval));
+#else
+    dest[0] = val & 0xFF;
+    dest[1] = val >> 8;
+    dest[2] = val >> 16;
+    dest[3] = val >> 24;
+    dest[4] = val >> 32;
+    dest[5] = val >> 40;
+    dest[6] = val >> 48;
+    dest[7] = val >> 56;
+#endif
+    return dyn_cursor;
+}
+
+inline uint8_t* write_field(uint8_t* dest, const uint8_t* dest_end, uint8_t* dyn_cursor,
+                            const int64_t& val) {
+#if IS_BIG_ENDIAN == 0
+    memcpy(dest, &val, sizeof(val));
+#elif IS_BIG_ENDIAN == 1
+    uint64_t sval = byteswap64(val);
+    memcpy(dest, &sval, sizeof(sval));
+#else
+    dest[0] = val & 0xFF;
+    dest[1] = val >> 8;
+    dest[2] = val >> 16;
+    dest[3] = val >> 24;
+    dest[4] = val >> 32;
+    dest[5] = val >> 40;
+    dest[6] = val >> 48;
+    dest[7] = val >> 56;
+#endif
+    return dyn_cursor;
+}
+
+inline uint8_t* write_field(uint8_t* dest, const uint8_t* dest_end, uint8_t* dyn_cursor,
+                            const float& val) {
+#if IS_BIG_ENDIAN == 0
+    memcpy(dest, &val, sizeof(val));
+#elif IS_BIG_ENDIAN == 1
+    uint32_t val_int;
+    memcpy(&val_int, &val, sizeof(val));
+    val_int = byteswap32(val_int);
+    memcpy(dest, &val_int, sizeof(val));
+#else
+    uint32_t val_int;
+    memcpy(&val_int, &val, sizeof(uint32_t));
+    dest[0] = val_int & 0xFF;
+    dest[1] = val_int >> 8;
+    dest[2] = val_int >> 16;
+    dest[3] = val_int >> 24;
+#endif
+    return dyn_cursor;
+}
+
+inline uint8_t* write_field(uint8_t* dest, const uint8_t* dest_end, uint8_t* dyn_cursor,
+                            const double& val) {
+#if IS_BIG_ENDIAN == 0
+    memcpy(dest, &val, sizeof(val));
+#elif IS_BIG_ENDIAN == 1
+    uint64_t val_int;
+    memcpy(&val_int, &val, sizeof(val));
+    val_int = byteswap64(val_int);
+    memcpy(dest, &val_int, sizeof(val));
+#else
+    uint64_t val_int;
+    memcpy(&val_int, &val, sizeof(uint64_t));
+    dest[0] = val_int & 0xFF;
+    dest[1] = val_int >> 8;
+    dest[2] = val_int >> 16;
+    dest[3] = val_int >> 24;
+    dest[4] = val_int >> 32;
+    dest[5] = val_int >> 40;
+    dest[6] = val_int >> 48;
+    dest[7] = val_int >> 56;
+#endif
+    return dyn_cursor;
+}
+
+inline uint8_t* write_field(uint8_t* dest, const uint8_t* dest_end, uint8_t* dyn_cursor,
+                            const bool& val) {
+    dest[0] = val ? 1 : 0;
+    return dyn_cursor;
+}
+
+inline uint8_t* write_field(uint8_t* dest, const uint8_t* dest_end, uint8_t* dyn_cursor,
+                            char* const& val) {
+    uint16_t str_len = strlen(val);
+    if (dyn_cursor + str_len + 1 > dest_end) return nullptr;  // +1 for null terminator
+
+    // Write the data offset to the static section of the buffer.
+    uint16_t offset = dyn_cursor - dest;
+    write_field(dest, dest_end, dyn_cursor, offset);
+
+    // Write the string to the dynamic section of the buffer.
+    memcpy(dyn_cursor, val, str_len + 1);
+    dyn_cursor += str_len + 1;
+
+    return dyn_cursor;
+}
+
+inline uint8_t* write_field(uint8_t* dest, const uint8_t* dest_end, uint8_t* dyn_cursor,
+                            const SimpleBufferWriter& val) {
+    return val.write_component(dest, dest_end, dyn_cursor);
+}
+
+/**
+ * @brief Writes a OneOf field to the destination buffer.
+ *
+ * @param[out] dest The destination to write static data to.
+ * @param[in] dest_end The end of the destination buffer.
+ * @param[out] dyn_cursor The dynamic cursor for writing variable-length fields.
+ * @param[in] tag The tag of the OneOf field.
+ * @param[in] val The value to write.
+ * @return A pointer to the end of the dynamic data written to the buffer, or `nullptr` if the
+ *         buffer was too small.
+ */
+template <typename T>
+uint8_t* write_oneof_field(uint8_t* dest, const uint8_t* dest_end, uint8_t* dyn_cursor, uint8_t tag,
+                           const T& val) {
+    uint16_t static_size = get_static_size(val);
+    if (dyn_cursor + static_size > dest_end) return nullptr;
+
+    // Write the tag and offset to the static section of the buffer.
+    uint16_t offset = dyn_cursor - dest;
+    dest[0] = tag;
+    write_field(dest + 1, dest_end, dyn_cursor, offset);
+
+    return write_field(dyn_cursor, dest_end, dyn_cursor + static_size, val);
+};
+
+//                                                                                                //
 // ========================================= ListWriter ========================================= //
 //                                                                                                //
 
@@ -140,11 +447,8 @@ class ListWriterImpl : public SimpleBufferWriter {
     uint8_t* write_component(uint8_t* dest, const uint8_t* dest_end,
                              uint8_t* dyn_cursor = nullptr) const override {
         uint16_t offset = dyn_cursor - dest;
-        dest[0] = len_ & 0xFF;
-        dest[1] = len_ >> 8;
-        dest[2] = offset & 0xFF;
-        dest[3] = offset >> 8;
-
+        write_field(dest, dest_end, dyn_cursor, len_);
+        write_field(dest + 2, dest_end, dyn_cursor, offset);
         return write_data_(dyn_cursor, dest_end, val_, len_);
     }
 
@@ -246,196 +550,6 @@ class OneOfWriter : public SimpleBufferWriter {
 };
 
 //                                                                                                //
-// ====================================== Get static size ======================================= //
-//                                                                                                //
-
-/**
- * @brief Returns the static size of a given value.
- *
- * This does not include dynamic data, such as strings or arrays.
- *
- * @param val The value to calculate the static size for.
- * @return The static size of the value.
- */
-inline uint16_t get_static_size(const uint8_t val) { return 1; }
-inline uint16_t get_static_size(const int8_t val) { return 1; }
-inline uint16_t get_static_size(const uint16_t val) { return 2; }
-inline uint16_t get_static_size(const int16_t val) { return 2; }
-inline uint16_t get_static_size(const uint32_t val) { return 4; }
-inline uint16_t get_static_size(const int32_t val) { return 4; }
-inline uint16_t get_static_size(const uint64_t val) { return 8; }
-inline uint16_t get_static_size(const int64_t val) { return 8; }
-inline uint16_t get_static_size(const float val) { return 4; }
-inline uint16_t get_static_size(const double val) { return 8; }
-inline uint16_t get_static_size(const bool val) { return 1; }
-inline uint16_t get_static_size(const SimpleBufferWriter& val) { return val.static_size(); }
-inline uint16_t get_static_size(char* const& val) { return 2; }
-
-//                                                                                                //
-// ======================================== Write field ========================================= //
-//                                                                                                //
-
-/**
- * @brief Writes a field value to the destination buffer.
- *
- * @param dest The destination to write static data to.
- * @param dest_end The end of the destination buffer.
- * @param dyn_cursor The dynamic cursor for writing variable-length fields.
- * @param val The value to write.
- * @return A pointer to the end of the dynamic data written to the buffer, or `nullptr` if the
- *         buffer was too small.
- */
-inline uint8_t* write_field(uint8_t* dest, const uint8_t* dest_end, uint8_t* dyn_cursor,
-                            const uint8_t& val) {
-    dest[0] = val;
-    return dyn_cursor;
-}
-
-inline uint8_t* write_field(uint8_t* dest, const uint8_t* dest_end, uint8_t* dyn_cursor,
-                            const int8_t& val) {
-    dest[0] = val;
-    return dyn_cursor;
-}
-
-inline uint8_t* write_field(uint8_t* dest, const uint8_t* dest_end, uint8_t* dyn_cursor,
-                            const uint16_t& val) {
-    dest[0] = val & 0xFF;
-    dest[1] = val >> 8;
-    return dyn_cursor;
-}
-
-inline uint8_t* write_field(uint8_t* dest, const uint8_t* dest_end, uint8_t* dyn_cursor,
-                            const int16_t& val) {
-    dest[0] = val & 0xFF;
-    dest[1] = val >> 8;
-    return dyn_cursor;
-}
-
-inline uint8_t* write_field(uint8_t* dest, const uint8_t* dest_end, uint8_t* dyn_cursor,
-                            const uint32_t& val) {
-    dest[0] = val & 0xFF;
-    dest[1] = val >> 8;
-    dest[2] = val >> 16;
-    dest[3] = val >> 24;
-    return dyn_cursor;
-}
-
-inline uint8_t* write_field(uint8_t* dest, const uint8_t* dest_end, uint8_t* dyn_cursor,
-                            const int32_t& val) {
-    dest[0] = val & 0xFF;
-    dest[1] = val >> 8;
-    dest[2] = val >> 16;
-    dest[3] = val >> 24;
-    return dyn_cursor;
-}
-
-inline uint8_t* write_field(uint8_t* dest, const uint8_t* dest_end, uint8_t* dyn_cursor,
-                            const uint64_t& val) {
-    dest[0] = val & 0xFF;
-    dest[1] = val >> 8;
-    dest[2] = val >> 16;
-    dest[3] = val >> 24;
-    dest[4] = val >> 32;
-    dest[5] = val >> 40;
-    dest[6] = val >> 48;
-    dest[7] = val >> 56;
-    return dyn_cursor;
-}
-
-inline uint8_t* write_field(uint8_t* dest, const uint8_t* dest_end, uint8_t* dyn_cursor,
-                            const int64_t& val) {
-    dest[0] = val & 0xFF;
-    dest[1] = val >> 8;
-    dest[2] = val >> 16;
-    dest[3] = val >> 24;
-    dest[4] = val >> 32;
-    dest[5] = val >> 40;
-    dest[6] = val >> 48;
-    dest[7] = val >> 56;
-    return dyn_cursor;
-}
-
-inline uint8_t* write_field(uint8_t* dest, const uint8_t* dest_end, uint8_t* dyn_cursor,
-                            const float& val) {
-    uint32_t val_int;
-    memcpy(&val_int, &val, sizeof(uint32_t));  // Only legal way to do this pre C++ 20
-    dest[0] = val_int & 0xFF;
-    dest[1] = val_int >> 8;
-    dest[2] = val_int >> 16;
-    dest[3] = val_int >> 24;
-    return dyn_cursor;
-}
-
-inline uint8_t* write_field(uint8_t* dest, const uint8_t* dest_end, uint8_t* dyn_cursor,
-                            const double& val) {
-    uint64_t val_int;
-    memcpy(&val_int, &val, sizeof(uint64_t));  // Only legal way to do this pre C++ 20
-    dest[0] = val_int & 0xFF;
-    dest[1] = val_int >> 8;
-    dest[2] = val_int >> 16;
-    dest[3] = val_int >> 24;
-    dest[4] = val_int >> 32;
-    dest[5] = val_int >> 40;
-    dest[6] = val_int >> 48;
-    dest[7] = val_int >> 56;
-    return dyn_cursor;
-}
-
-inline uint8_t* write_field(uint8_t* dest, const uint8_t* dest_end, uint8_t* dyn_cursor,
-                            const bool& val) {
-    dest[0] = val ? 1 : 0;
-    return dyn_cursor;
-}
-
-inline uint8_t* write_field(uint8_t* dest, const uint8_t* dest_end, uint8_t* dyn_cursor,
-                            char* const& val) {
-    uint16_t str_len = strlen(val);
-    if (dyn_cursor + str_len + 1 > dest_end) return nullptr;  // +1 for null terminator
-
-    // Write the data offset to the static section of the buffer.
-    uint16_t offset = dyn_cursor - dest;
-    dest[0] = offset & 0xFF;
-    dest[1] = offset >> 8;
-
-    // Write the string to the dynamic section of the buffer.
-    memcpy(dyn_cursor, val, str_len + 1);
-    dyn_cursor += str_len + 1;
-
-    return dyn_cursor;
-}
-
-inline uint8_t* write_field(uint8_t* dest, const uint8_t* dest_end, uint8_t* dyn_cursor,
-                            const SimpleBufferWriter& val) {
-    return val.write_component(dest, dest_end, dyn_cursor);
-}
-
-/**
- * @brief Writes a OneOf field to the destination buffer.
- *
- * @param[out] dest The destination to write static data to.
- * @param[in] dest_end The end of the destination buffer.
- * @param[out] dyn_cursor The dynamic cursor for writing variable-length fields.
- * @param[in] tag The tag of the OneOf field.
- * @param[in] val The value to write.
- * @return A pointer to the end of the dynamic data written to the buffer, or `nullptr` if the
- *         buffer was too small.
- */
-template <typename T>
-uint8_t* write_oneof_field(uint8_t* dest, const uint8_t* dest_end, uint8_t* dyn_cursor, uint8_t tag,
-                           const T& val) {
-    uint16_t static_size = get_static_size(val);
-    if (dyn_cursor + static_size > dest_end) return nullptr;
-
-    // Write the tag and offset to the static section of the buffer.
-    uint16_t offset = dyn_cursor - dest;
-    dest[0] = tag;
-    dest[1] = offset & 0xFF;
-    dest[2] = offset >> 8;
-
-    return write_field(dyn_cursor, dest_end, dyn_cursor + static_size, val);
-};
-
-//                                                                                                //
 // ===================================== SimpleBufferReader ===================================== //
 //                                                                                                //
 
@@ -513,8 +627,15 @@ template <>
 inline uint16_t read_field<>(const uint8_t* src, uint16_t idx) {
     src += idx * 2;
     uint16_t val = 0;
+#if IS_BIG_ENDIAN == 0
+    memcpy(&val, src, sizeof(val));
+#elif IS_BIG_ENDIAN == 1
+    memcpy(&val, src, sizeof(val));
+    val = byteswap16(val);
+#else
     val |= src[0] << 0;
     val |= src[1] << 8;
+#endif
     return val;
 }
 
@@ -527,8 +648,15 @@ template <>
 inline int16_t read_field<>(const uint8_t* src, uint16_t idx) {
     src += idx * 2;
     int16_t val = 0;
+#if IS_BIG_ENDIAN == 0
+    memcpy(&val, src, sizeof(val));
+#elif IS_BIG_ENDIAN == 1
+    memcpy(&val, src, sizeof(val));
+    val = byteswap16(val);
+#else
     val |= src[0] << 0;
     val |= src[1] << 8;
+#endif
     return val;
 }
 
@@ -541,10 +669,17 @@ template <>
 inline uint32_t read_field<>(const uint8_t* src, uint16_t idx) {
     src += idx * 4;
     uint32_t val = 0;
+#if IS_BIG_ENDIAN == 0
+    memcpy(&val, src, sizeof(val));
+#elif IS_BIG_ENDIAN == 1
+    memcpy(&val, src, sizeof(val));
+    val = byteswap32(val);
+#else
     val |= src[0] << 0;
     val |= src[1] << 8;
     val |= src[2] << 16;
     val |= src[3] << 24;
+#endif
     return val;
 }
 
@@ -557,10 +692,17 @@ template <>
 inline int32_t read_field<>(const uint8_t* src, uint16_t idx) {
     src += idx * 4;
     int32_t val = 0;
+#if IS_BIG_ENDIAN == 0
+    memcpy(&val, src, sizeof(val));
+#elif IS_BIG_ENDIAN == 1
+    memcpy(&val, src, sizeof(val));
+    val = byteswap32(val);
+#else
     val |= src[0] << 0;
     val |= src[1] << 8;
     val |= src[2] << 16;
     val |= src[3] << 24;
+#endif
     return val;
 }
 
@@ -573,6 +715,12 @@ template <>
 inline uint64_t read_field<>(const uint8_t* src, uint16_t idx) {
     src += idx * 8;
     uint64_t val = 0;
+#if IS_BIG_ENDIAN == 0
+    memcpy(&val, src, sizeof(val));
+#elif IS_BIG_ENDIAN == 1
+    memcpy(&val, src, sizeof(val));
+    val = byteswap64(val);
+#else
     val |= src[0] << 0;
     val |= src[1] << 8;
     val |= src[2] << 16;
@@ -581,6 +729,7 @@ inline uint64_t read_field<>(const uint8_t* src, uint16_t idx) {
     val |= (uint64_t)src[5] << 40;
     val |= (uint64_t)src[6] << 48;
     val |= (uint64_t)src[7] << 56;
+#endif
     return val;
 }
 
@@ -593,6 +742,12 @@ template <>
 inline int64_t read_field<>(const uint8_t* src, uint16_t idx) {
     src += idx * 8;
     int64_t val = 0;
+#if IS_BIG_ENDIAN == 0
+    memcpy(&val, src, sizeof(val));
+#elif IS_BIG_ENDIAN == 1
+    memcpy(&val, src, sizeof(val));
+    val = byteswap32(val);
+#else
     val |= src[0] << 0;
     val |= src[1] << 8;
     val |= src[2] << 16;
@@ -601,6 +756,7 @@ inline int64_t read_field<>(const uint8_t* src, uint16_t idx) {
     val |= (uint64_t)src[5] << 40;
     val |= (uint64_t)src[6] << 48;
     val |= (uint64_t)src[7] << 56;
+#endif
     return val;
 }
 
@@ -612,13 +768,22 @@ inline int64_t read_field<>(const uint8_t* src, uint16_t idx) {
 template <>
 inline float read_field<float>(const uint8_t* src, uint16_t idx) {
     src += idx * 4;
-    uint32_t val_int = 0;
     float val;
+#if IS_BIG_ENDIAN == 0
+    memcpy(&val, src, sizeof(val));
+#elif IS_BIG_ENDIAN == 1
+    uint32_t val_int;
+    memcpy(&val_int, src, sizeof(val));
+    val_int = byteswap32(val_int);
+    memcpy(&val, &val_int, sizeof(val));
+#else
+    uint32_t val_int = 0;
     val_int |= src[0] << 0;
     val_int |= src[1] << 8;
     val_int |= src[2] << 16;
     val_int |= src[3] << 24;
     memcpy(&val, &val_int, sizeof(float));
+#endif
     return val;
 }
 
@@ -630,8 +795,16 @@ inline float read_field<float>(const uint8_t* src, uint16_t idx) {
 template <>
 inline double read_field<double>(const uint8_t* src, uint16_t idx) {
     src += idx * 8;
-    uint64_t val_int = 0;
     double val;
+#if IS_BIG_ENDIAN == 0
+    memcpy(&val, src, sizeof(val));
+#elif IS_BIG_ENDIAN == 1
+    uint32_t val_int;
+    memcpy(&val_int, src, sizeof(val));
+    val_int = byteswap64(val_int);
+    memcpy(&val, &val_int, sizeof(val));
+#else
+    uint32_t val_int = 0;
     val_int |= src[0] << 0;
     val_int |= src[1] << 8;
     val_int |= src[2] << 16;
@@ -641,6 +814,7 @@ inline double read_field<double>(const uint8_t* src, uint16_t idx) {
     val_int |= (uint64_t)src[6] << 48;
     val_int |= (uint64_t)src[7] << 56;
     memcpy(&val, &val_int, sizeof(double));
+#endif
     return val;
 }
 
