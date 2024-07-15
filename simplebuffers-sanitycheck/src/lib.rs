@@ -1,8 +1,12 @@
+//! A code generator that prints a schema to `stdout`.
+//!
+//! This can be used to verify that a schema is being parsed correctly.
+
 use simplebuffers_codegen::{register_generator, CodeGenerator};
 use simplebuffers_core::{Enum, EnumVariant, Sequence, Type};
 
 //                                                                                                //
-// ========================================== Register ========================================== //
+// ===================================== Register Generator ===================================== //
 //                                                                                                //
 
 #[derive(Debug)]

@@ -1,3 +1,5 @@
+//! Annotates an [SBSchema] with extra fields and traits that are used in C++ code generation.
+
 use convert_case::Case;
 use convert_case::Casing;
 use simplebuffers_core::Enum;

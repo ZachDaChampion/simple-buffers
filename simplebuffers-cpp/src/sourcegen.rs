@@ -1,3 +1,5 @@
+//! Generates a C++ source file.
+
 use crate::annotate::CppOneOf;
 use crate::annotate::CppOneOfField;
 use crate::annotate::CppSchema;

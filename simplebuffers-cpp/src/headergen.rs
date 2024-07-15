@@ -1,3 +1,5 @@
+//! Generates C++ header files.
+
 use crate::annotate::CppEnum;
 use crate::annotate::CppOneOf;
 use crate::annotate::CppSchema;

@@ -1,7 +1,9 @@
 //! An AST builder can parse a string into a syntax tree. This parser implements recursive descent
-//! parsing. See: <http://craftinginterpreters.com/parsing-expressions.html>
+//! parsing. See:
+//! [craftinginterpreters.com/parsing-expressions.html](http://craftinginterpreters.com/parsing-expressions.html)
 //!
 //! # Grammar
+//! 
 //! - file       ->  (sequence | enum)* EOF
 //! - sequence   ->  sequence" IDENTIFIER "{" (field ";")* "}"
 //! - field      ->  IDENTIFIER ":" type

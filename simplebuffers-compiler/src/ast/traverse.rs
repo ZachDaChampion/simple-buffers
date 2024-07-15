@@ -1,3 +1,5 @@
+//! Implements iterators for syntax trees.
+
 use super::{SyntaxTree, TaggedSyntaxTree};
 use std::collections::VecDeque;
 

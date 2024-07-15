@@ -1,3 +1,23 @@
+//! Tokenizes an incoming file.
+//!
+//! # Rules
+//!
+//! These are the rules that the tokenizer follows, in order.
+//!
+//! - Ignore whitespace
+//! - Ignore comments
+//! - Capture `oneof` keyword
+//! - Capture `enum` keyword
+//! - Capture `{`
+//! - Capture `}`
+//! - Capture `[`
+//! - Capture `]`
+//! - Capture `:`
+//! - Capture `;`
+//! - Capture `=`
+//! - Capture numbers
+//! - Capture identifiers
+
 mod error;
 pub use self::error::TokenizerError;
 

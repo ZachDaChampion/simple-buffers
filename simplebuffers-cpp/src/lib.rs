@@ -1,3 +1,5 @@
+//! C++ code generator.
+
 mod annotate;
 mod argparse;
 mod headergen;
@@ -28,17 +30,13 @@ impl CodeGenerator for CPPCodeGenerator {
         params: &simplebuffers_codegen::GeneratorParams,
     ) -> Result<(), String> {
         let generator_params = parse_args(params);
-        println!("C++ Generator! Args: {:?}", generator_params);
-
         let annotated = annotate_schema(schema);
-        println!("\n\nAnnotated:\n\n{:?}", annotated);
 
+        // Generate files.
         let header = generate_header(&generator_params, &annotated);
-        println!("\n\nHeader:\n\n{}", header);
-
         let source = generate_source(&generator_params, &annotated);
-        println!("\n\nSource:\n\n{}", source);
 
+        // Write header file.
         {
             let mut header_file = File::create(format!(
                 "{}/{}.hpp",
@@ -50,6 +48,7 @@ impl CodeGenerator for CPPCodeGenerator {
                 .expect("Failed to write header file.");
         }
 
+        // Write source file.
         {
             let mut source_file = File::create(format!(
                 "{}/{}.cpp",

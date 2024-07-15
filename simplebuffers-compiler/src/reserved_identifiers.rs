@@ -1,9 +1,12 @@
+//! Check schemas for reserved identifiers.
+
 use colored::Colorize;
 use convert_case::{Case, Casing};
 use itertools::Itertools;
 use simplebuffers_core::{Field, SBSchema, Type};
 use std::fmt::{self};
 
+/// The target of an error that occurred while checking for reserved identifiers.
 enum ReserveCheckErrorTarget {
     Sequence,
     Enum,

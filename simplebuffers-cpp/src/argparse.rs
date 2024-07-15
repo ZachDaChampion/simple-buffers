@@ -1,3 +1,5 @@
+//! Parses generator-specific arguments contained in [GeneratorParams::additional_args].
+
 use clap::Parser;
 use simplebuffers_codegen::GeneratorParams;
 

@@ -1,4 +1,4 @@
-//! This file parses a SyntaxTree into a series of sequences and enums.
+//! Parses a [TaggedSyntaxTree] into a series of sequences and enums.
 
 use super::CompilerError;
 use crate::ast::{SyntaxTree, TaggedSyntaxTree, TreeTraversal};

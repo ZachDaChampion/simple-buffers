@@ -1,3 +1,8 @@
+//! Read CLI arguments, parse the schema, and run the appropriate code generator.
+//!
+//! This implementation is temporary. A more complete version will be written sometime in the
+//! future.
+
 mod ast;
 mod compiler;
 mod internal_generators;
