@@ -117,10 +117,6 @@ fn define_enum(data: &CppEnum) -> String {
         enum class {name} : {dtype} {{
             {variants}
         }};",
-        // uint16_t get_static_size(const {name} val) {{ return {size}; }}",
-        // uint8_t* write_field(uint8_t* dest, const uint8_t* dest_end, uint8_t* dyn_cursor, const {name}& val) {{
-        //     return simplebuffers::write_field(dest, dest_end, dyn_cursor, static_cast<const {min_dtype}>(val));
-        // }}",
         variants = indent_by(4, variants)
     }
 }
