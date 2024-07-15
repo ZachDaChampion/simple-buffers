@@ -1,4 +1,25 @@
 //! C++ code generator.
+//!
+//! This module implements the C++ code generation for SimpleBuffers schemas. It takes a
+//! SimpleBuffers schema as input and produces C++ header (.hpp) and source (.cpp) files.
+//!
+//! The generator works in several stages:
+//!
+//! 1. **Argument Parsing**: The `argparse` module processes generator-specific arguments.
+//!
+//! 2. **Schema Annotation**: The `annotate` module takes the input schema and annotates it with
+//!    C++-specific information, adjusting names to match C++ conventions and adding extra data
+//!    needed for code generation.
+//!
+//! 3. **Header Generation**: The `headergen` module generates C++ header files, including enum
+//!    definitions, forward declarations, and class definitions for sequence writers and readers.
+//!
+//! 4. **Source Generation**: The `sourcegen` module generates C++ source files, implementing the
+//!    methods declared in the header files.
+//!
+//! The generator creates separate writer and reader classes for each sequence and oneof in the
+//! schema. It also handles nested structures and generates appropriate code for serialization and
+//! deserialization.
 
 mod annotate;
 mod argparse;
