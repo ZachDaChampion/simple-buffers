@@ -22,30 +22,33 @@ mod error;
 pub use self::error::TokenizerError;
 
 use colored::Colorize;
-use lazy_static::lazy_static;
 use regex::Regex;
 use regex_macro::regex;
 use std::fmt;
+use std::sync::LazyLock;
 
 type OptionalTokenGenerator = Option<fn(String) -> TokenType>;
-lazy_static! {
-    static ref SPEC: Vec<(&'static Regex, OptionalTokenGenerator)> = vec![
-        (regex!(r"^\s+"), None), // Ignore whitespace
-        (regex!(r"^//.*?(\r|\n|\r\n)"), None), // Ignore comments
+static TOKEN_MAP: LazyLock<Vec<(&'static Regex, OptionalTokenGenerator)>> = LazyLock::new(|| {
+    vec![
+        (regex!(r"^\s+"), None),                               // Ignore whitespace
+        (regex!(r"^//.*?(\r|\n|\r\n)"), None),                 // Ignore comments
         (regex!(r"^sequence"), Some(|_| TokenType::Sequence)), // Capture sequence keyword
-        (regex!(r"^oneof"), Some(|_| TokenType::Oneof)), // Capture oneof keyword
-        (regex!(r"^enum"), Some(|_| TokenType::Enum)), // Capture enum keyword
-        (regex!(r"^\{"), Some(|_| TokenType::OpenBrace)), // Capture opening brace
-        (regex!(r"^\}"), Some(|_| TokenType::CloseBrace)), // Capture closing brace
-        (regex!(r"^\["), Some(|_| TokenType::OpenBracket)), // Capture opening bracket
-        (regex!(r"^\]"), Some(|_| TokenType::CloseBracket)), // Capture closing bracket
-        (regex!(r"^:"), Some(|_| TokenType::Colon)), // Capture colon
-        (regex!(r"^;"), Some(|_| TokenType::Semicolon)), // Capture semicolon
-        (regex!(r"^="), Some(|_| TokenType::Equals)), // Capture equals sign
+        (regex!(r"^oneof"), Some(|_| TokenType::Oneof)),       // Capture oneof keyword
+        (regex!(r"^enum"), Some(|_| TokenType::Enum)),         // Capture enum keyword
+        (regex!(r"^\{"), Some(|_| TokenType::OpenBrace)),      // Capture opening brace
+        (regex!(r"^\}"), Some(|_| TokenType::CloseBrace)),     // Capture closing brace
+        (regex!(r"^\["), Some(|_| TokenType::OpenBracket)),    // Capture opening bracket
+        (regex!(r"^\]"), Some(|_| TokenType::CloseBracket)),   // Capture closing bracket
+        (regex!(r"^:"), Some(|_| TokenType::Colon)),           // Capture colon
+        (regex!(r"^;"), Some(|_| TokenType::Semicolon)),       // Capture semicolon
+        (regex!(r"^="), Some(|_| TokenType::Equals)),          // Capture equals sign
         (regex!(r"^[0-9_]+(?:\.[0-9_]+)?"), Some(TokenType::Number)), // Capture numbers
-        (regex!(r"^[a-zA-Z_][a-zA-Z0-9_]*"), Some(TokenType::Identifier)), // Capture identifiers
-    ];
-}
+        (
+            regex!(r"^[a-zA-Z_][a-zA-Z0-9_]*"),
+            Some(TokenType::Identifier),
+        ), // Capture identifiers
+    ]
+});
 
 /// A specific token type and associated data.
 #[derive(Clone, Debug, PartialEq)]
@@ -312,7 +315,7 @@ impl<'a> Tokenizer<'a> {
 
         // Iterate through patterns and try to match them
         let sliced = &self.source[self.cursor..];
-        for (re, token_fn) in SPEC.iter() {
+        for (re, token_fn) in TOKEN_MAP.iter() {
             match re.find(sliced) {
                 // Pattern doesn't match, continue to next pattern
                 None => continue,
