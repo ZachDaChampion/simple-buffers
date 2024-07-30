@@ -2,11 +2,14 @@
 
 ## [v0.1.3-alpha] - 2024-07-30
 
-### Behind the Scenes
+### Common
 
 - Update dependencies
-- Switch from `lazy_static` to the new `LazyLock`
 - Reorganize `test` folder
+
+### Compiler
+
+- Switch from `lazy_static` to the new `LazyLock`
 
 ## [v0.1.2-alpha] - 2024-07-30
 
