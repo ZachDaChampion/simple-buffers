@@ -1,5 +1,11 @@
 # Changelog
 
+## [v0.1.4-alpha] - 2024-07-30
+
+### Common
+
+- Add `rust-version` to `Cargo.toml`
+
 ## [v0.1.3-alpha] - 2024-07-30
 
 ### Common

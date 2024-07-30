@@ -2,6 +2,7 @@
 name = "simplebuffers-cpp"
 version = "0.1.2"
 edition = "2021"
+rust-version = "1.74"
 
 [lib]
 crate-type = ["lib", "dylib"]
