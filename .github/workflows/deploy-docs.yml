@@ -1,48 +1,46 @@
 name: Deploy docs to pages
 
 on:
-    push:
-        branches: ["main"]
-    workflow_dispatch:
-
+  push:
+    branches: ["main"]
 
 permissions:
-    contents: read
-    pages: write
-    id-token: write
+  contents: read
+  pages: write
+  id-token: write
 
 jobs:
-    build:
-        runs-on: ubuntu-latest
-        steps:
-            - uses: actions/checkout@v4
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
 
-            - name: Set up Rust
-              uses: actions-rs/toolchain@v1
-              with:
-                    profile: minimal
-                    toolchain: stable
+      - name: Set up Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
 
-            - name: Build docs
-              run: |
-                cargo doc --no-deps
-                echo '<meta http-equiv="refresh" content="0; url=simplebuffers_core">' > target/doc/index.html
+      - name: Build docs
+        run: |
+          cargo doc --no-deps
+          echo '<meta http-equiv="refresh" content="0; url=simplebuffers_core">' > target/doc/index.html
 
-            - name: Setup pages
-              uses: actions/configure-pages@v5
+      - name: Setup pages
+        uses: actions/configure-pages@v5
 
-            - name: Upload artifact
-              uses: actions/upload-pages-artifact@v3
-              with:
-                    path: 'target/doc'
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: "target/doc"
 
-    deploy:
-        environment:
-            name: github-pages
-            url: ${{ steps.deployment.outputs.page_url }}
-        runs-on: ubuntu-latest
-        needs: build
-        steps:
-            - name: Deploy to pages
-              id: deployment
-              uses: actions/deploy-pages@v4
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - name: Deploy to pages
+        id: deployment
+        uses: actions/deploy-pages@v4
