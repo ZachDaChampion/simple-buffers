@@ -164,7 +164,7 @@ block-beta
 
 To solve this, we must find a way to force `joints` to be a fixed size. Fortunately, a solution
 already exists: pointers. Instead of storing the full list in `joints`, we can instead store a
-fixed-size pointer and place the list at the end of the buffer, where it can no longer hurt us. In
+fixed-size pointer and place the list at the end of the buffer where it can no longer hurt us. In
 practice, we prefer to store a relative offset rather than an absolute pointer, as this allows
 complex sequences to be decomposed more effectively.
 
