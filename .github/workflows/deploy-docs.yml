@@ -1,7 +1,7 @@
 # Adapted from:
 # https://github.com/rust-lang/mdBook/wiki/Automated-Deployment%3A-GitHub-Actions#GitHub-Pages-Deploy
 
-name: Deploy
+name: Deploy book to pages
 on:
   push:
     branches:
@@ -25,6 +25,13 @@ jobs:
           mkdir mdbook
           curl -sSL $url | tar -xz --directory=./mdbook
           echo `pwd`/mdbook >> $GITHUB_PATH
+      - name: Install mermaid plugin
+        run: |
+          tag=$(curl 'https://api.github.com/repos/badboy/mdbook-mermaid/releases/latest' | jq -r '.tag_name')
+          url="https://github.com/badboy/mdbook-mermaid/releases/download/${tag}/mdbook-mermaid-${tag}-x86_64-unknown-linux-gnu.tar.gz"
+          mkdir mdbook-mermaid
+          curl -sSL $url | tar -xz --directory=./mdbook-mermaid
+          echo `pwd`/mdbook-mermaid >> $GITHUB_PATH
       - name: Build Book
         run: |
           cd doc
