@@ -81,6 +81,17 @@ impl CodeGenerator for CPPCodeGenerator {
                 .expect("Failed to write header file.");
         }
 
+        // Copy corelib to header directory.
+        {
+            let corelib = include_str!("../corelib/simplebuffers.hpp");
+            let mut corelib_file =
+                File::create(format!("{}/simplebuffers.hpp", generator_params.header_dir))
+                    .expect("Failed to open corelib header file");
+            corelib_file
+                .write_all(corelib.as_bytes())
+                .expect("Failed to write header file.");
+        }
+
         Ok(())
     }
 

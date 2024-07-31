@@ -1,5 +1,11 @@
 # Changelog
 
+## [v0.1.3-alpha] - 2024-07-31
+
+### C++ Codegen
+
+- Write corelib to header directory
+
 ## [v0.1.2-alpha] - 2024-07-30
 
 ### Common
