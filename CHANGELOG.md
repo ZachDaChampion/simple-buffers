@@ -14,7 +14,6 @@
 ### Misc
 
 - Reorganize `test` folder
-- Upload raw .exe releases for Windows
 
 ## [v0.1.1-alpha] - 2024-07-30
 
