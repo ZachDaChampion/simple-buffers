@@ -25,28 +25,57 @@ use colored::Colorize;
 use regex::Regex;
 use regex_macro::regex;
 use std::fmt;
+
+#[cfg(use_lazy_static)]
+use lazy_static::lazy_static;
+
+#[cfg(not(use_lazy_static))]
 use std::sync::LazyLock;
 
 type OptionalTokenGenerator = Option<fn(String) -> TokenType>;
-static TOKEN_MAP: LazyLock<Vec<(&'static Regex, OptionalTokenGenerator)>> = LazyLock::new(|| {
-    vec![
+
+#[cfg(use_lazy_static)]
+lazy_static! {
+    /// A list of regex sequences matched to tokens.
+    #[deprecated = "Update rustc to 1.80 or newer."]
+    static ref TOKEN_MAP: [(&'static Regex, OptionalTokenGenerator); 14] = [
+        (regex!(r"^\s+"), None), // Ignore whitespace
+        (regex!(r"^//.*?(\r|\n|\r\n)"), None), // Ignore comments
+        (regex!(r"^sequence"), Some(|_| TokenType::Sequence)), // Capture sequence keyword
+        (regex!(r"^oneof"), Some(|_| TokenType::Oneof)), // Capture oneof keyword
+        (regex!(r"^enum"), Some(|_| TokenType::Enum)), // Capture enum keyword
+        (regex!(r"^\{"), Some(|_| TokenType::OpenBrace)), // Capture opening brace
+        (regex!(r"^\}"), Some(|_| TokenType::CloseBrace)), // Capture closing brace
+        (regex!(r"^\["), Some(|_| TokenType::OpenBracket)), // Capture opening bracket
+        (regex!(r"^\]"), Some(|_| TokenType::CloseBracket)), // Capture closing bracket
+        (regex!(r"^:"), Some(|_| TokenType::Colon)), // Capture colon
+        (regex!(r"^;"), Some(|_| TokenType::Semicolon)), // Capture semicolon
+        (regex!(r"^="), Some(|_| TokenType::Equals)), // Capture equals sign
+        (regex!(r"^[0-9_]+(?:\.[0-9_]+)?"), Some(TokenType::Number)), // Capture numbers
+        (regex!(r"^[a-zA-Z_][a-zA-Z0-9_]*"), Some(TokenType::Identifier)), // Capture identifiers
+    ];
+}
+
+/// A list of regex sequences matched to tokens.
+#[cfg(not(use_lazy_static))]
+#[allow(clippy::incompatible_msrv)]
+static TOKEN_MAP: LazyLock<[(&'static Regex, OptionalTokenGenerator); 14]> = LazyLock::new(|| {
+    use TokenType as TT;
+    [
         (regex!(r"^\s+"), None),                               // Ignore whitespace
         (regex!(r"^//.*?(\r|\n|\r\n)"), None),                 // Ignore comments
-        (regex!(r"^sequence"), Some(|_| TokenType::Sequence)), // Capture sequence keyword
-        (regex!(r"^oneof"), Some(|_| TokenType::Oneof)),       // Capture oneof keyword
-        (regex!(r"^enum"), Some(|_| TokenType::Enum)),         // Capture enum keyword
-        (regex!(r"^\{"), Some(|_| TokenType::OpenBrace)),      // Capture opening brace
-        (regex!(r"^\}"), Some(|_| TokenType::CloseBrace)),     // Capture closing brace
-        (regex!(r"^\["), Some(|_| TokenType::OpenBracket)),    // Capture opening bracket
-        (regex!(r"^\]"), Some(|_| TokenType::CloseBracket)),   // Capture closing bracket
-        (regex!(r"^:"), Some(|_| TokenType::Colon)),           // Capture colon
-        (regex!(r"^;"), Some(|_| TokenType::Semicolon)),       // Capture semicolon
-        (regex!(r"^="), Some(|_| TokenType::Equals)),          // Capture equals sign
-        (regex!(r"^[0-9_]+(?:\.[0-9_]+)?"), Some(TokenType::Number)), // Capture numbers
-        (
-            regex!(r"^[a-zA-Z_][a-zA-Z0-9_]*"),
-            Some(TokenType::Identifier),
-        ), // Capture identifiers
+        (regex!(r"^sequence"), Some(|_| TT::Sequence)),        // Capture sequence keyword
+        (regex!(r"^oneof"), Some(|_| TT::Oneof)),              // Capture oneof keyword
+        (regex!(r"^enum"), Some(|_| TT::Enum)),                // Capture enum keyword
+        (regex!(r"^\{"), Some(|_| TT::OpenBrace)),             // Capture opening brace
+        (regex!(r"^\}"), Some(|_| TT::CloseBrace)),            // Capture closing brace
+        (regex!(r"^\["), Some(|_| TT::OpenBracket)),           // Capture opening bracket
+        (regex!(r"^\]"), Some(|_| TT::CloseBracket)),          // Capture closing bracket
+        (regex!(r"^:"), Some(|_| TT::Colon)),                  // Capture colon
+        (regex!(r"^;"), Some(|_| TT::Semicolon)),              // Capture semicolon
+        (regex!(r"^="), Some(|_| TT::Equals)),                 // Capture equals sign
+        (regex!(r"^[0-9_]+(?:\.[0-9_]+)?"), Some(TT::Number)), // Capture numbers
+        (regex!(r"^[a-zA-Z_][a-zA-Z0-9_]*"), Some(TT::Identifier)), // Capture identifiers
     ]
 });
 
