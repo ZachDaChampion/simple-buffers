@@ -5,6 +5,7 @@
 # Usage
 
 - [Installation](./installation.md)
+- [Compiler Usage](./usage.md)
 - [Schema File Format](./schema.md)
 
 # Development
