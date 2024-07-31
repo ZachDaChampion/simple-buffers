@@ -1,4 +1,4 @@
-# Optimized Raw Binary Data Handling
+# Optimized Binary Data Serialization
 
 SimpleBuffers provides special optimizations for handling lists of uint8_t, which is particularly
 useful for sending raw binary data. This optimization uses memcpy to efficiently copy the entire

@@ -4,14 +4,14 @@
 
 # Usage
 
-- [Installation](./installation.md)
-- [Compiler Usage](./usage.md)
-- [Schema File Format](./schema.md)
+- [Installation](./usage/installation.md)
+- [Compiler Usage](./usage/usage.md)
+- [Schema File Format](./usage/schema.md)
 
 # Language-Specific APIs
 
-- [C++](./cpp.md)
-    - [Optimized Binary Data Serialization](./cpp_optimized_binary.md)
+- [C++](./cpp/cpp.md)
+    - [Optimized Binary Data Serialization](./cpp/optimized_binary.md)
 
 # Development
 
