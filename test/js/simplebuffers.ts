@@ -1,0 +1,1 @@
+../../simplebuffers-js/corelib/simplebuffers.ts

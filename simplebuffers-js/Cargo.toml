@@ -1,0 +1,17 @@
+[package]
+name = "simplebuffers-cpp"
+version = "0.1.2"
+edition = "2021"
+rust-version = "1.74"
+
+[lib]
+crate-type = ["lib", "dylib"]
+
+[dependencies]
+simplebuffers-core = { path = "../simplebuffers-core" }
+simplebuffers-codegen = { path = "../simplebuffers-codegen" }
+clap = { version = "4.5.8", features = ["derive"] }
+indoc = "2.0.5"
+itertools = "0.13.0"
+indent = "0.1.1"
+convert_case = "0.6.0"
