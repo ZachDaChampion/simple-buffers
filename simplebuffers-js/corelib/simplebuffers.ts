@@ -30,7 +30,7 @@ export function serialize_list<RawType>(
     static_offset: number,
     dyn_offset: number
 ): SerializedComponent {
-    const values = raw_values.map((x) => (x instanceof Component ? x : component_constructor(x)));
+    const values = raw_values.map(component_constructor);
 
     // Resize buffer to fit list, if necessary
     const serialized_list_size = values.map((x) => x.static_size).reduce((a, b) => a + b);
@@ -51,7 +51,7 @@ export function serialize_list<RawType>(
     for (const value of values) {
         const result = value.serialize_component(buffer, list_offset, dyn_offset);
         list_offset += value.static_size;
-        dyn_offset += result.dyn_offset;
+        dyn_offset = result.dyn_offset;
         buffer = result.buffer;
     }
 
