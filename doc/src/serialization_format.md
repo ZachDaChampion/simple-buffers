@@ -217,7 +217,7 @@ structure.
 
 Like a list, the oneof stores two values in the fixed-size segment of the buffer: the type of data
 being stored, and an offset to the data. The data type is stored as a single octet. Oneofs with more
-than 255 members are unsupported.
+than 256 members are unsupported.
 
 Let's take a look at how a `Request` with an `Init` payload would be serialized:
 
