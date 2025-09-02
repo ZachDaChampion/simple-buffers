@@ -1,0 +1,10 @@
+{
+    "compilerOptions": {
+        "sourceMap": true,
+        "target": "es2020", // Example target
+        "lib": [
+            "es2020", // Includes features up to ES2020
+            "DOM"
+        ]
+    }
+}

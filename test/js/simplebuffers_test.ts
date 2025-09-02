@@ -7,11 +7,11 @@ import {
     String,
     I64,
     OneOfOption,
-    ComponentConstructor,
+    identity,
     serialize_list,
     U8,
     deserialize_list,
-} from "./simplebuffers";
+} from "./simplebuffers.js";
 
 export enum RobotJoint {
     j0 = 0,
@@ -27,7 +27,8 @@ export enum BigBoy {
 }
 
 export class Init extends Sequence {
-    static_size = 4;
+    static static_size = 4;
+    static_size = Init.static_size;
     expected_firmware: number;
 
     constructor(expected_firmware: number) {
@@ -72,7 +73,7 @@ export class MoveTo extends Sequence {
     ): SerializedComponent {
         const write_result = serialize_list<MoveToEntry>(
             this.joints,
-            MoveToEntry.constructor as ComponentConstructor,
+            identity,
             buffer,
             static_offset,
             dyn_offset
@@ -158,12 +159,12 @@ export namespace StringTest {
             return [
                 {
                     key: "test",
-                    constructor: String.constructor as ComponentConstructor,
+                    constructor: (x) => new String(x),
                     deserializer: String.deserialize,
                 },
                 {
                     key: "string",
-                    constructor: I64.constructor as ComponentConstructor,
+                    constructor: (x) => new I64(x),
                     deserializer: I64.deserialize,
                 },
             ];
@@ -193,6 +194,8 @@ export namespace StringTest {
 }
 
 export class Request extends Sequence {
+    static static_size = 11;
+    static_size = Request.static_size;
     id: number;
     enmArray: RobotJoint[];
     payload: Request.Payload__OneOf;
@@ -202,6 +205,33 @@ export class Request extends Sequence {
         this.id = id;
         this.enmArray = enmArray;
         this.payload = payload;
+    }
+
+    serialize_component(
+        buffer: ArrayBuffer,
+        static_offset: number,
+        dyn_offset: number
+    ): SerializedComponent {
+        const static_view = new DataView(buffer);
+        static_view.setUint32(static_offset, this.id, true);
+        static_offset += 4;
+        let write_result = serialize_list(
+            this.enmArray,
+            (x) => new U8(x),
+            buffer,
+            static_offset,
+            dyn_offset
+        );
+        buffer = write_result.buffer;
+        dyn_offset = write_result.dyn_offset;
+        static_offset += 4;
+        write_result = this.payload.serialize_component(buffer, static_offset, dyn_offset);
+        buffer = write_result.buffer;
+        dyn_offset = write_result.dyn_offset;
+        return {
+            buffer: buffer,
+            dyn_offset: dyn_offset,
+        };
     }
 
     static deserialize(buffer: ArrayBuffer): Request {
@@ -219,18 +249,17 @@ export namespace Request {
             return [
                 {
                     key: "init",
-                    constructor: Init.constructor as ComponentConstructor,
+                    constructor: identity,
                     deserializer: Init.deserialize,
                 },
                 {
                     key: "moveTo",
-                    constructor: MoveTo.constructor as ComponentConstructor,
+                    constructor: identity,
                     deserializer: MoveTo.deserialize,
                 },
                 {
                     key: "testOneOf",
-                    constructor: Payload__OneOf.TestOneOf__OneOf
-                        .constructor as ComponentConstructor,
+                    constructor: identity,
                     deserializer: Payload__OneOf.TestOneOf__OneOf.deserialize,
                 },
             ];
@@ -264,17 +293,17 @@ export namespace Request {
                 return [
                     {
                         key: "moveToEntry",
-                        constructor: MoveToEntry.constructor as ComponentConstructor,
+                        constructor: identity,
                         deserializer: MoveToEntry.deserialize,
                     },
                     {
                         key: "bigBoy",
-                        constructor: U8.constructor as ComponentConstructor,
+                        constructor: (x) => new U8(x),
                         deserializer: U8.deserialize,
                     },
                     {
                         key: "stringTest",
-                        constructor: String.constructor as ComponentConstructor,
+                        constructor: (x) => new String(x),
                         deserializer: String.deserialize,
                     },
                 ];

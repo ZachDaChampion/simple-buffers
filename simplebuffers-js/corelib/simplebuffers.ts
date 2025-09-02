@@ -10,7 +10,7 @@ function buffer_reserve(buffer: ArrayBuffer, additional_space: number): ArrayBuf
     }
 }
 
-function identity(x: Component): Component {
+export function identity(x: Component): Component {
     return x;
 }
 
@@ -39,7 +39,7 @@ export function serialize_list<RawType>(
     const static_view = new DataView(buffer);
 
     // Write length
-    static_view.setUint16(static_offset, values.length);
+    static_view.setUint16(static_offset, values.length, true);
     static_offset += 2;
 
     // Write offset to list
@@ -200,7 +200,7 @@ export class U16 extends Component {
 
     static deserialize(buffer: ArrayBuffer): number {
         const static_view = new DataView(buffer);
-        return static_view.getUint16(0);
+        return static_view.getUint16(0, true);
     }
 }
 
@@ -229,7 +229,7 @@ export class I16 extends Component {
 
     static deserialize(buffer: ArrayBuffer): number {
         const static_view = new DataView(buffer);
-        return static_view.getInt16(0);
+        return static_view.getInt16(0, true);
     }
 }
 
@@ -258,7 +258,7 @@ export class U32 extends Component {
 
     static deserialize(buffer: ArrayBuffer): number {
         const static_view = new DataView(buffer);
-        return static_view.getUint32(0);
+        return static_view.getUint32(0, true);
     }
 }
 
@@ -287,7 +287,7 @@ export class I32 extends Component {
 
     static deserialize(buffer: ArrayBuffer): number {
         const static_view = new DataView(buffer);
-        return static_view.getInt32(0);
+        return static_view.getInt32(0, true);
     }
 }
 
@@ -480,7 +480,7 @@ export class String extends Component {
 
     static deserialize(buffer: ArrayBuffer): string {
         const static_view = new DataView(buffer);
-        const offset = static_view.getUint16(0);
+        const offset = static_view.getUint16(0, true);
         const string_buffer = new Uint8Array(buffer, offset);
         const null_terminator_pos = string_buffer.indexOf(0x00);
 
@@ -500,7 +500,7 @@ export interface OneOfOption {
 }
 
 export class OneOf extends Component {
-    static static_size = 4;
+    static static_size = 3;
     static_size = OneOf.static_size;
     key: string;
     key_id: number;
@@ -511,6 +511,7 @@ export class OneOf extends Component {
         super();
         this.key_id = key_id;
         this.value = value;
+        this.key = options[key_id].key;
 
         if (value instanceof Component) {
             this.component_constructor = identity;
@@ -548,7 +549,7 @@ export class OneOf extends Component {
     static deserialize_impl(buffer: ArrayBuffer, options: OneOfOption[]): OneOf {
         const static_view = new DataView(buffer);
         const key = static_view.getUint8(0);
-        const offset = static_view.getUint16(1);
+        const offset = static_view.getUint16(1, true);
 
         if (key >= options.length) {
             throw new Error(`Deserialized oneof key ${key} is invalid`);

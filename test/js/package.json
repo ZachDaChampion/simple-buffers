@@ -4,7 +4,7 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "node index.json"
   },
   "author": "",
   "license": "ISC",
@@ -12,6 +12,7 @@
     "@eslint/js": "^9.34.0",
     "eslint": "^9.34.0",
     "globals": "^16.3.0",
+    "tsconfig-paths": "^4.2.0",
     "typescript-eslint": "^8.41.0"
   }
 }
