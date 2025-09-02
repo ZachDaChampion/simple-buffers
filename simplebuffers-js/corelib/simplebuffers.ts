@@ -1,3 +1,5 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
+
 function buffer_reserve(buffer: ArrayBuffer, additional_space: number): ArrayBuffer {
     if (additional_space > 0) {
         const new_buffer = new ArrayBuffer(buffer.byteLength + additional_space);
@@ -19,6 +21,62 @@ export type Deserializer = (buffer: ArrayBuffer) => unknown;
 export interface SerializedComponent {
     buffer: ArrayBuffer;
     dyn_offset: number;
+}
+
+export function serialize_list<RawType>(
+    raw_values: RawType[],
+    component_constructor: ComponentConstructor,
+    buffer: ArrayBuffer,
+    static_offset: number,
+    dyn_offset: number
+): SerializedComponent {
+    const values = raw_values.map((x) => (x instanceof Component ? x : component_constructor(x)));
+
+    // Resize buffer to fit list, if necessary
+    const serialized_list_size = values.map((x) => x.static_size).reduce((a, b) => a + b);
+    const remaining_dyn_buffer_space = buffer.byteLength - dyn_offset;
+    buffer = buffer_reserve(buffer, serialized_list_size - remaining_dyn_buffer_space);
+    const static_view = new DataView(buffer);
+
+    // Write length
+    static_view.setUint16(static_offset, values.length);
+    static_offset += 2;
+
+    // Write offset to list
+    static_view.setUint16(static_offset, dyn_offset - static_offset, true);
+
+    // Serialize list into dynamic section
+    let list_offset = dyn_offset;
+    dyn_offset += serialized_list_size;
+    for (const value of values) {
+        const result = value.serialize_component(buffer, list_offset, dyn_offset);
+        list_offset += value.static_size;
+        dyn_offset += result.dyn_offset;
+        buffer = result.buffer;
+    }
+
+    return {
+        buffer: buffer,
+        dyn_offset: dyn_offset,
+    };
+}
+
+export function deserialize_list<RawType>(
+    buffer: ArrayBuffer,
+    element_size: number,
+    deserializer: (buffer: ArrayBuffer) => RawType
+): RawType[] {
+    const static_view = new DataView(buffer);
+    const length = static_view.getUint16(0, true);
+    const offset = static_view.getUint16(2, true);
+    const list_buffer = buffer.slice(2 + offset);
+
+    const result: RawType[] = [];
+    for (let i = 0; i < length; ++i) {
+        result.push(deserializer(list_buffer.slice(i * element_size)));
+    }
+
+    return result;
 }
 
 export class Writer {
