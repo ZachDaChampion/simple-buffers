@@ -282,7 +282,6 @@ fn impl_sequence_reader(sequence: &CppSequence) -> String {
     let oneofs = impl_oneof_readers(sequence);
 
     // Generate sequence code.
-    // TODO: Find out if we should be comparing to `static_size` or `static_size - 1`.
     formatdoc! {
         r"
         {section_comment}

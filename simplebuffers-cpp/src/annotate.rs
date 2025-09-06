@@ -140,25 +140,13 @@ impl CppSequenceField {
         match &self.ty {
             CppType::Enum(_, size) => format!(
                 "static_cast<{}>({})",
-                match size {
-                    1 => "uint8_t",
-                    2 => "uint16_t",
-                    4 => "uint32_t",
-                    8 => "uint64_t",
-                    _ => panic!("Invalid size {} for enum {}", size, self.name),
-                },
+                size.to_type(),
                 self.name
             ),
             CppType::Array(b) => match **b {
                 CppType::Enum(_, size) => format!(
                     "simplebuffers::priv::ListWriterImpl<{sizetype}>(reinterpret_cast<{sizetype}* const>({name}.val), {name}.len)",
-                    sizetype = match size {
-                        1 => "uint8_t",
-                        2 => "uint16_t",
-                        4 => "uint32_t",
-                        8 => "uint64_t",
-                        _ => panic!("Invalid size {} for enum {}", size, self.name),
-                    },
+                    sizetype = size.to_type(),
                     name = self.name
                 ),
                 _ => {
@@ -190,25 +178,13 @@ impl CppOneOfField {
         match &self.ty {
             CppType::Enum(_, size) => format!(
                 "static_cast<{}>(*value_.{})",
-                match size {
-                    1 => "uint8_t",
-                    2 => "uint16_t",
-                    4 => "uint32_t",
-                    8 => "uint64_t",
-                    _ => panic!("Invalid size {} for enum {}", size, self.name),
-                },
+                size.to_type(),
                 self.name
             ),
             CppType::Array(b) => match **b {
                 CppType::Enum(_, size) => format!(
                     "simplebuffers::priv::ListWriterImpl<{sizetype}>(reinterpret_cast<{sizetype}* const>(*value.{name}.val), *value.{name}.len)",
-                    sizetype = match size {
-                        1 => "uint8_t",
-                        2 => "uint16_t",
-                        4 => "uint32_t",
-                        8 => "uint64_t",
-                        _ => panic!("Invalid size {} for enum {}", size, self.name),
-                    },
+                    sizetype = size.to_type(),
                     name = self.name
                 ),
                 _ => {
