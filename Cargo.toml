@@ -8,4 +8,5 @@ members = [
     "simplebuffers-codegen",
     "simplebuffers-sanitycheck",
     "simplebuffers-cpp",
+    "simplebuffers-js",
 ]

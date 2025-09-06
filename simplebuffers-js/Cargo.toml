@@ -1,5 +1,5 @@
 [package]
-name = "simplebuffers-cpp"
+name = "simplebuffers-js"
 version = "0.1.2"
 edition = "2021"
 rust-version = "1.74"

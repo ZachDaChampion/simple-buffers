@@ -31,5 +31,7 @@ macro_rules! register_internal_generators {
 register_internal_generators!(
     "sanitycheck": simplebuffers_sanitycheck::SanityCheckCodeGenerator,
     "c++": simplebuffers_cpp::CPPCodeGenerator,
-    "cpp": simplebuffers_cpp::CPPCodeGenerator
+    "cpp": simplebuffers_cpp::CPPCodeGenerator,
+    "ts": simplebuffers_js::TsCodeGenerator,
+    "typescript": simplebuffers_js::TsCodeGenerator
 );

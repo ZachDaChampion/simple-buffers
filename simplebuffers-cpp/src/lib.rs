@@ -75,10 +75,10 @@ impl CodeGenerator for CPPCodeGenerator {
                 "{}/{}.cpp",
                 generator_params.global.dest_dir, generator_params.global.file_name
             ))
-            .expect("Failed to open header file");
+            .expect("Failed to open source file");
             source_file
                 .write_all(source.as_bytes())
-                .expect("Failed to write header file.");
+                .expect("Failed to write source file.");
         }
 
         // Copy corelib to header directory.
